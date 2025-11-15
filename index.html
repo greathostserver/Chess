@@ -1,0 +1,1143 @@
+<!doctype html>
+<html lang="fa">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>بازی شطرنج کامل — نسخه پیشرفته (اصلاح‌شده)</title>
+<style>
+:root{--bg:#2c3e50;--panel:#34495e;--accent:#f1c40f;--ok:#27ae60;--warn:#e67e22}
+body{margin:0;font-family:Tahoma, sans-serif;background:var(--bg);color:#fff;display:flex;justify-content:center;padding:20px;box-sizing:border-box}
+.container{max-width:1200px;width:100%;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.left{flex:1;min-width:320px;max-width:820px}
+.right{width:320px;min-width:240px}
+header h1{font-size:2rem;color:var(--accent);margin:0 0 6px 0;text-align:center}
+.board-wrap{display:flex;flex-direction:column;align-items:center;gap:16px}
+#chess-board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border:3px solid #5D2906;max-width:800px;width:100%;aspect-ratio:1/1;box-shadow:0 10px 30px rgba(0,0,0,.3);position:relative}
+.cell{display:flex;justify-content:center;align-items:center;font-weight:bold;position:relative;user-select:none}
+.cell .piece{width:110%;height:110%;display:flex;justify-content:center;align-items:center;border-radius:3px;transition:all .12s transform: scale(1.5); }
+.cell.hover{transform:scale(1.04);z-index:10}
+.cell.selected{box-shadow:0 0 18px rgba(168,230,163,.9);transform:scale(1.06);z-index:20}
+.cell .move-dot{position:absolute;width:20px;height:20px;border-radius:50%;opacity:0.85;pointer-events:none;transform:translateY(-20%);display:none;border:1.5px solid rgba(255,255,255,0.6)}
+.cell.can-move .move-dot{display:block;background:rgba(46,204,113,0.7)}
+.cell.can-capture .move-dot{display:block;background:rgba(231,76,60,0.75);border:1.5px solid rgba(255,255,255,0.7)}
+.cell.last-move{outline:4px solid rgba(241,196,15,.18)}
+.controls{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{padding:10px 14px;background:var(--accent);color:#222;border:none;border-radius:6px;cursor:pointer;font-weight:bold}
+.btn.warn{background:var(--warn);color:#222}
+.status-panel{background:var(--panel);padding:12px;border-radius:10px}
+.info{font-size:1rem;margin:6px 0}
+.small{font-size:.9rem;color:#ddd}
+#move-list{max-height: 180px;overflow:auto;background:rgba(255,255,255,.03);padding:10px;border-radius:8px}
+.move-item{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.03);display:flex;justify-content:space-between;gap:8px}
+.captured{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:rgba(255,255,255,.02);border-radius:6px}
+.coord{position:absolute;font-size:9px;color:rgba(0,0,0,.45);user-select:none}
+.coord.row{left:4px;top:4px}
+.coord.col{right:4px;bottom:4px}
+@media(max-width:900px){.right{width:100%}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="left">
+    <header>
+      <h1>بازی شطرنج کامل — نسخه پیشرفته (اصلاح‌شده)</h1>
+      <p style="text-align:center">نوبت: <strong id="chess-turn-indicator">سفید</strong></p>
+    </header>
+
+    <div class="board-wrap">
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:6px;">
+        <div class="chess-theme-option" data-theme="classic" title="Classic" style="width:36px;height:36px;border-radius:6px;cursor:pointer;border:2px solid var(--accent);background:linear-gradient(135deg,#f0d9b5 50%,#b58863 50%);"></div>
+        <div class="chess-theme-option" data-theme="blue" title="Blue" style="width:36px;height:36px;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,#a7c7e7 50%,#5d8aa8 50%);"></div>
+        <div class="chess-theme-option" data-theme="green" title="Green" style="width:36px;height:36px;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,#c1e1c1 50%,#7d9d7d 50%);"></div>
+        <div class="chess-theme-option" data-theme="purple" title="Purple" style="width:36px;height:36px;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,#d8bfd8 50%,#9370db 50%);"></div>
+        <div class="chess-theme-option" data-theme="dark" title="Dark" style="width:36px;height:36px;border-radius:6px;cursor:pointer;background:linear-gradient(135deg,#a9a9a9 50%,#696969 50%);"></div>
+<button id="toggle-coordinates" class="btn" style="padding:8px 14px;background:var(--panel);color:var(--accent);font-weight:bold;border:2px solid var(--accent);border-radius:8px;cursor:pointer;">مختصات: روشن</button>
+<button id="toggle-move-hints" class="btn" style="padding:8px 14px;background:var(--panel);color:var(--accent);font-weight:bold;border:2px solid var(--accent);border-radius:8px;cursor:pointer;">راهنما: روشن</button>
+<button id="toggle-game-mode" class="btn" style="padding:8px 14px;background:var(--panel);color:var(--accent);font-weight:bold;border:2px solid var(--accent);border-radius:8px;cursor:pointer;">حالت بازی</button>
+      </div>
+
+      <div id="chess-board" aria-label="Chess board" role="grid"></div>
+
+      <div style="display:flex;justify-content:center;margin-top:8px;gap:8px;">
+        <button id="chess-new-game" class="btn" title="بازی جدید">بازی جدید</button>
+        <button id="chess-undo-move" class="btn warn" title="حرکت قبلی">لغو حرکت</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="status-panel">
+      <p id="chess-game-status" class="info">برای شروع بازی، یک مهره سفید را انتخاب کنید</p>
+      <p id="chess-check-status" class="small" style="color:#e74c3c;display:none;font-weight:bold">شاه شما در حالت کیش است!</p>
+      <p id="chess-king-selected-status" class="small" style="display:none;color:#9b59b6;font-weight:bold">شاه انتخاب شده — حرکت مناسب را انتخاب کنید.</p>
+    </div>
+
+    <div style="margin-top:12px" class="status-panel">
+      <h3 style="margin:0 0 8px 0">حرکت‌ها</h3>
+      <div id="move-list"><div style="text-align:center;color:#bbb">هنوز حرکتی انجام نشده</div></div>
+    </div>
+
+    <div style="margin-top:12px" class="status-panel">
+      <h3 style="margin:0 0 8px 0">مهره‌های گرفته‌شده</h3>
+      <div style="font-size:9px;color:#ddd;margin-bottom:6px">سفید:</div>
+      <div id="captured-white" class="captured"></div>
+      <div style="font-size:9px;color:#ddd;margin:8px 0 6px 0">سیاه:</div>
+      <div id="captured-black" class="captured"></div>
+    </div>
+  </div>
+</div>
+
+<div id="chess-alert" style="position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#e74c3c;color:white;padding:12px 18px;border-radius:6px;z-index:1200;display:none;font-weight:bold"></div>
+
+<div id="game-mode-dialog" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#34495e;border:3px solid var(--accent);border-radius:10px;padding:16px;z-index:2000;min-width:280px;">
+  <h3 style="margin:0 0 12px 0;color:white;text-align:center">انتخاب حالت بازی</h3>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    
+<select id="game-mode" style="padding:8px;border-radius:6px;background:var(--panel);color:white;border:1px solid var(--accent);">
+  <option value="friend">بازی با دوست</option>
+  <option value="ai-normal">حریف معمولی (Stockfish)</option>
+  <option value="ai-pro">حریف حرفه‌ای (Stockfish)</option>
+  <option value="ai-grandmaster">استاد بزرگ (Stockfish)</option>
+</select>
+
+    <button id="apply-game-mode" class="btn" style="width:100%">اعمال حالت بازی</button>
+    <button id="close-game-mode" class="btn warn" style="width:100%">بستن</button>
+  </div>
+</div>
+
+<script>
+/* --- constants & setup (kept compatible with original logic) --- */
+const WHITE='white', BLACK='black', EMPTY=null;
+const PAWN='pawn', ROOK='rook', KNIGHT='knight', BISHOP='bishop', QUEEN='queen', KING='king';
+const PIECE_SYMBOLS = {
+  [WHITE]:{[PAWN]:'♟',[ROOK]:'♜',[KNIGHT]:'♞',[BISHOP]:'♝',[QUEEN]:'♛',[KING]:'♚'},
+  [BLACK]:{[PAWN]:'♟',[ROOK]:'♜',[KNIGHT]:'♞',[BISHOP]:'♝',[QUEEN]:'♛',[KING]:'♚'}
+};
+const BOARD_THEMES = {
+ classic:{white:'#f0d9b5',black:'#b58863'},
+ blue:{white:'#a7c7e7',black:'#5d8aa8'},
+ green:{white:'#c1e1c1',black:'#7d9d7d'},
+ purple:{white:'#d8bfd8',black:'#9370db'},
+ dark:{white:'#a9a9a9',black:'#696969'}
+};
+
+let board=[], selectedPiece=null, currentPlayer=WHITE, moveHistory=[], gameOver=false;
+let kingInCheck = {[WHITE]:false,[BLACK]:false}, kingPosition={[WHITE]:null,[BLACK]:null};
+let currentTheme='classic', enPassantTarget=null, castlingRights={}, promotionPending=null;
+let captured = { [WHITE]:[], [BLACK]:[] };
+let moveHintsVisible = true; // حالت جدید برای نمایش راهنما
+let gameMode = 'friend'; // حالت پیش‌فرض: بازی با دوست
+
+/* --- helpers --- */
+function coordToAlg(row,col){
+  const files=['a','b','c','d','e','f','g','h'];
+  return files[col] + (8 - row);
+}
+function pieceLetter(piece){
+  if(!piece) return '';
+  if(piece.type===PAWN) return '';
+  if(piece.type===KNIGHT) return 'N';
+  return piece.type[0].toUpperCase();
+}
+
+/* --- initialize board & UI --- */
+function initializeBoard(){
+  const chessboard = document.getElementById('chess-board');
+  chessboard.innerHTML='';
+  board = Array(8).fill().map(()=>Array(8).fill(EMPTY));
+  // place pawns
+  for(let i=0;i<8;i++){ board[6][i]={type:PAWN,color:WHITE,hasMoved:false}; board[1][i]={type:PAWN,color:BLACK,hasMoved:false}; }
+  // rooks
+  board[7][0]= {type:ROOK,color:WHITE,hasMoved:false}; board[7][7]={type:ROOK,color:WHITE,hasMoved:false};
+  board[0][0]= {type:ROOK,color:BLACK,hasMoved:false}; board[0][7]={type:ROOK,color:BLACK,hasMoved:false};
+  // knights
+  board[7][1]={type:KNIGHT,color:WHITE}; board[7][6]={type:KNIGHT,color:WHITE};
+  board[0][1]={type:KNIGHT,color:BLACK}; board[0][6]={type:KNIGHT,color:BLACK};
+  // bishops
+  board[7][2]={type:BISHOP,color:WHITE}; board[7][5]={type:BISHOP,color:WHITE};
+  board[0][2]={type:BISHOP,color:BLACK}; board[0][5]={type:BISHOP,color:BLACK};
+  // queens
+  board[7][3]={type:QUEEN,color:WHITE}; board[0][3]={type:QUEEN,color:BLACK};
+  // kings
+  board[7][4]={type:KING,color:WHITE,hasMoved:false}; board[0][4]={type:KING,color:BLACK,hasMoved:false};
+  kingPosition[WHITE]={row:7,col:4}; kingPosition[BLACK]={row:0,col:4};
+  castlingRights = { [WHITE]:{kingside:true,queenside:true}, [BLACK]:{kingside:true,queenside:true} };
+  captured = { [WHITE]:[], [BLACK]:[] };
+
+  // create cells
+  for(let row=0;row<8;row++){
+    for(let col=0;col<8;col++){
+      const cell = document.createElement('div');
+      cell.className='cell';
+      cell.setAttribute('data-row',row);
+      cell.setAttribute('data-col',col);
+      // coords overlay
+      const rlabel = document.createElement('div'); rlabel.className='coord row'; rlabel.textContent = (8-row);
+      const clabel = document.createElement('div'); clabel.className='coord col'; clabel.textContent = ['a','b','c','d','e','f','g','h'][col];
+      cell.appendChild(rlabel); cell.appendChild(clabel);
+      // piece container
+      const piece = document.createElement('div'); piece.className='piece';
+      cell.appendChild(piece);
+      // move dot
+      const dot = document.createElement('div'); dot.className='move-dot'; cell.appendChild(dot);
+
+      // style
+      applyThemeToCell(cell,row,col);
+
+      // hover effects
+      cell.addEventListener('mouseenter',()=>{ if(!gameOver) cell.classList.add('hover'); });
+      cell.addEventListener('mouseleave',()=>{ cell.classList.remove('hover'); });
+
+      cell.addEventListener('click', ()=> handleCellClick(row,col));
+      chessboard.appendChild(cell);
+    }
+  }
+  updateBoardDisplay();
+  updateGameStatus();
+  updateCapturedDisplay();
+  updateMoveList();
+  // highlight theme selected
+  document.querySelectorAll('.chess-theme-option').forEach(opt=>{
+    opt.style.borderColor = opt.getAttribute('data-theme')===currentTheme? 'var(--accent)':'transparent';
+  });
+}
+
+/* --- sync king positions helper (fixes rare false-check bugs) --- */
+function syncKingPositions(){
+  // scan board and set kingPosition for both colors based on actual board state
+  kingPosition[WHITE] = null;
+  kingPosition[BLACK] = null;
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      const p = board[r][c];
+      if(p && p.type===KING){
+        kingPosition[p.color] = {row:r,col:c};
+      }
+    }
+  }
+}
+
+/* --- theme --- */
+function applyThemeToCell(cell,row,col){
+  const isWhiteCell = (row+col)%2===0;
+  const theme = BOARD_THEMES[currentTheme];
+  cell.style.backgroundColor = isWhiteCell ? theme.white : theme.black;
+  cell.style.fontSize = 'clamp(24px,4.5vw,56px)';
+  const pieceEl = cell.querySelector('.piece');
+  if(pieceEl) pieceEl.style.color = '';
+}
+
+/* --- move generation helpers (reuse original functions mostly) --- */
+/* For brevity, include simplified copies of original isValidX functions.
+   These are intentionally consistent with original rules so existing behavior preserved.
+*/
+
+function isValidKnightMove(fromRow,fromCol,toRow,toCol){
+  const r=Math.abs(fromRow-toRow), c=Math.abs(fromCol-toCol);
+  return (r===2&&c===1)||(r===1&&c===2);
+}
+function isValidBishopMove(fromRow,fromCol,toRow,toCol){
+  if(Math.abs(fromRow-toRow)!==Math.abs(fromCol-toCol)) return false;
+  const rowStep = fromRow<toRow?1:-1, colStep = fromCol<toCol?1:-1;
+  let r=fromRow+rowStep, c=fromCol+colStep;
+  while(r!==toRow && c!==toCol){ if(board[r][c]) return false; r+=rowStep; c+=colStep; }
+  return true;
+}
+function isValidRookMove(fromRow,fromCol,toRow,toCol){
+  if(fromRow!==toRow && fromCol!==toCol) return false;
+  if(fromRow===toRow){
+    const s=Math.min(fromCol,toCol), e=Math.max(fromCol,toCol);
+    for(let cc=s+1;cc<e;cc++) if(board[fromRow][cc]) return false;
+  }else{
+    const s=Math.min(fromRow,toRow), e=Math.max(fromRow,toRow);
+    for(let rr=s+1;rr<e;rr++) if(board[rr][fromCol]) return false;
+  }
+  return true;
+}
+function isValidQueenMove(fR,fC,tR,tC){ return isValidRookMove(fR,fC,tR,tC)||isValidBishopMove(fR,fC,tR,tC); }
+function isValidKingMove(fromRow,fromCol,toRow,toCol){
+  const rd=Math.abs(fromRow-toRow), cd=Math.abs(fromCol-toCol);
+  if(rd<=1 && cd<=1 && (rd>0||cd>0)) return true;
+  if(rd===0 && Math.abs(fromCol-toCol)===2) return canCastle(fromRow,fromCol,toRow,toCol);
+  return false;
+}
+function isValidPawnMoveForPiece(fromRow,fromCol,toRow,toCol,piece){
+  const direction = piece.color===WHITE?-1:1;
+  const startRow = piece.color===WHITE?6:1;
+
+  // حرکت مستقیم به جلو
+  if(fromCol===toCol){
+    // حرکت یک خانه به جلو
+    if(toRow===fromRow+direction && !board[toRow][toCol]) return true;
+    // حرکت دو خانه به جلو در حرکت اول
+    if(fromRow===startRow && toRow===fromRow+2*direction && !board[fromRow+direction][fromCol] && !board[toRow][toCol]) return true;
+  }
+
+  // حرکت ضربدری برای گرفتن مهره حریف
+  if(Math.abs(fromCol-toCol)===1 && toRow===fromRow+direction){
+    if(board[toRow][toCol] && board[toRow][toCol].color!==piece.color) return true;
+    // آن پاسان
+    if(enPassantTarget && toRow===enPassantTarget.row && toCol===enPassantTarget.col){
+      const enPassantPawnRow = fromRow, enPassantPawnCol = toCol;
+      if(board[enPassantPawnRow][enPassantPawnCol] && board[enPassantPawnRow][enPassantPawnCol].type===PAWN && board[enPassantPawnRow][enPassantPawnCol].color!==piece.color) return true;
+    }
+  }
+  return false;
+}
+function isValidMoveForPiece(fromRow,fromCol,toRow,toCol,piece){
+  const target = board[toRow][toCol];
+  if(target && target.color===piece.color) return false;
+  switch(piece.type){
+    case PAWN: return isValidPawnMoveForPiece(fromRow,fromCol,toRow,toCol,piece);
+    case ROOK: return isValidRookMove(fromRow,fromCol,toRow,toCol);
+    case KNIGHT: return isValidKnightMove(fromRow,fromCol,toRow,toCol);
+    case BISHOP: return isValidBishopMove(fromRow,fromCol,toRow,toCol);
+    case QUEEN: return isValidQueenMove(fromRow,fromCol,toRow,toCol);
+    case KING: return isValidKingMove(fromRow,fromCol,toRow,toCol);
+  }
+  return false;
+}
+
+/* check logic (kept from original) */
+function isKingInCheck(color){
+  const kingPos = kingPosition[color];
+  if(!kingPos) return false; // safety: if king not on board, cannot be in-check in this function
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const piece = board[r][c];
+    if(piece && piece.color!==color){
+      if(isValidMoveForPiece(r,c,kingPos.row,kingPos.col,piece)) return true;
+    }
+  }
+  return false;
+}
+
+/* isValidMove with simulation to prevent moving into check */
+function isValidMove(fromRow,fromCol,toRow,toCol){
+  if(gameOver) return false;
+  if(fromRow===toRow && fromCol===toCol) return false;
+  const piece = board[fromRow][fromCol];
+  if(!piece || piece.color!==currentPlayer) return false;
+  const target = board[toRow][toCol];
+  if(target && target.color===currentPlayer) return false;
+
+  // First check if the move is valid for the piece type
+  let valid=false;
+  switch(piece.type){
+    case PAWN: valid = isValidPawnMoveForPiece(fromRow,fromCol,toRow,toCol,piece); break;
+    case ROOK: valid = isValidRookMove(fromRow,fromCol,toRow,toCol); break;
+    case KNIGHT: valid = isValidKnightMove(fromRow,fromCol,toRow,toCol); break;
+    case BISHOP: valid = isValidBishopMove(fromRow,fromCol,toRow,toCol); break;
+    case QUEEN: valid = isValidQueenMove(fromRow,fromCol,toRow,toCol); break;
+    case KING: valid = isValidKingMove(fromRow,fromCol,toRow,toCol); break;
+  }
+  if(!valid) return false;
+
+  // Simulate the move to check if king would be in check
+  const originalTarget = board[toRow][toCol];
+  board[toRow][toCol] = piece;
+  board[fromRow][fromCol] = EMPTY;
+
+  const originalKingPos = {...kingPosition[piece.color]};
+  if(piece.type === KING) {
+    kingPosition[piece.color] = {row: toRow, col: toCol};
+  }
+
+  const wouldBeInCheck = isKingInCheck(piece.color);
+
+  // Restore the board
+  board[fromRow][fromCol] = piece;
+  board[toRow][toCol] = originalTarget;
+  if(piece.type === KING) {
+    kingPosition[piece.color] = originalKingPos;
+  }
+
+  return !wouldBeInCheck;
+}
+
+/* --- castling helpers (kept) --- */
+function canCastle(fromRow,fromCol,toRow,toCol){
+  const piece = board[fromRow][fromCol];
+  if(!piece || piece.hasMoved || kingInCheck[piece.color]) return false;
+  const isKingside = toCol>fromCol;
+  const rookCol = isKingside?7:0;
+  const rook = board[fromRow][rookCol];
+  if(!rook || rook.type!==ROOK || rook.hasMoved || rook.color!==piece.color) return false;
+  const startCol = Math.min(fromCol,rookCol)+1, endCol = Math.max(fromCol,rookCol)-1;
+  for(let col=startCol;col<=endCol;col++) if(board[fromRow][col]) return false;
+  const step = isKingside?1:-1;
+  for(let col=fromCol; col!==toCol; col+=step){
+    const originalPiece = board[fromRow][col];
+    board[fromRow][col]=EMPTY; board[fromRow][col+step]=piece;
+    const originalKingPos = {...kingPosition[piece.color]}; kingPosition[piece.color]={row:fromRow,col:col+step};
+    const inCheck = isKingInCheck(piece.color);
+    board[fromRow][col]=originalPiece; board[fromRow][col+step]=EMPTY; kingPosition[piece.color]=originalKingPos;
+    if(inCheck) return false;
+  }
+  return true;
+}
+function performCastle(fromRow,fromCol,toRow,toCol){
+  const piece = board[fromRow][fromCol];
+  const isKingside = toCol>fromCol;
+  const rookFromCol = isKingside?7:0;
+  const rookToCol = isKingside?toCol-1:toCol+1;
+  board[toRow][toCol]=piece; board[fromRow][fromCol]=EMPTY; kingPosition[piece.color]={row:toRow,col:toCol};
+  const rook = board[fromRow][rookFromCol]; board[fromRow][rookToCol]=rook; board[fromRow][rookFromCol]=EMPTY;
+  updateBoardDisplay();
+}
+
+/* --- game status checks (uses original logic simplified) --- */
+function isKingCaptured(){
+  let white=false, black=false;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=board[r][c]; if(p && p.type===KING){ if(p.color===WHITE) white=true; else black=true; }
+  }
+  return { white: !white, black: !black };
+}
+function isStalemate(color){
+  if(isKingInCheck(color)) return false;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const piece = board[r][c];
+    if(piece && piece.color===color){
+      for(let tr=0;tr<8;tr++) for(let tc=0;tc<8;tc++) if(isValidMove(r,c,tr,tc)) return false;
+    }
+  }
+  return true;
+}
+function isCheckmate(color){
+  if(!isKingInCheck(color)) return false;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const piece=board[r][c];
+    if(piece && piece.color===color){
+      for(let tr=0;tr<8;tr++) for(let tc=0;tc<8;tc++){
+        if(isValidMove(r,c,tr,tc)){
+          const original = board[tr][tc]; board[tr][tc]=piece; board[r][c]=EMPTY;
+          const origKing = {...kingPosition[color]}; if(piece.type===KING) kingPosition[color]={row:tr,col:tc};
+          const still = isKingInCheck(color);
+          board[r][c]=piece; board[tr][tc]=original; if(piece.type===KING) kingPosition[color]=origKing;
+          if(!still) return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+function checkForCheck(){ kingInCheck[WHITE]=isKingInCheck(WHITE); kingInCheck[BLACK]=isKingInCheck(BLACK); updateCheckDisplay(); }
+function updateCheckDisplay(){
+  const checkStatus = document.getElementById('chess-check-status');
+  const kingSelected = document.getElementById('chess-king-selected-status');
+  if(kingInCheck[currentPlayer]) checkStatus.style.display='block'; else checkStatus.style.display='none';
+  if(selectedPiece && board[selectedPiece[0]][selectedPiece[1]] && board[selectedPiece[0]][selectedPiece[1]].type===KING && kingInCheck[currentPlayer]) kingSelected.style.display='block'; else kingSelected.style.display='none';
+}
+
+/* --- selection & highlighting of possible moves (new feature) --- */
+function showPossibleMoves(fromRow,fromCol){
+  clearMoveHighlights();
+  if (!moveHintsVisible) return; // اگر راهنما خاموش باشد، نمایش نده
+
+  const piece = board[fromRow][fromCol];
+  if(!piece) return;
+  for(let tr=0;tr<8;tr++) for(let tc=0;tc<8;tc++){
+    if(isValidMove(fromRow,fromCol,tr,tc)){
+      const cell = document.querySelector(`[data-row="${tr}"][data-col="${tc}"]`);
+      if(cell){
+        cell.classList.add('can-move');
+        if(board[tr][tc] && board[tr][tc].color!==piece.color) cell.classList.add('can-capture');
+      }
+    }
+  }
+}
+function clearMoveHighlights(){
+  document.querySelectorAll('.cell').forEach(c=>{ c.classList.remove('can-move','can-capture'); });
+}
+
+/* --- selection handlers --- */
+function setSelectedPiece(row,col){
+  clearSelection();
+  selectedPiece=[row,col];
+  const cell = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+  if(cell) cell.classList.add('selected');
+  showPossibleMoves(row,col);
+  updateCheckDisplay();
+}
+function clearSelection(){
+  if(selectedPiece){
+    const [r,c] = selectedPiece;
+    const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+    if(cell) cell.classList.remove('selected');
+  }
+  selectedPiece=null;
+  clearMoveHighlights();
+  updateCheckDisplay();
+}
+
+/* --- move execution & history (enhanced: simple algebraic notation) --- */
+function handleCellClick(row,col){
+  if(gameOver) return;
+  if(promotionPending) return;
+  const piece = board[row][col];
+  if(selectedPiece){
+    const [sr,sc] = selectedPiece;
+    if(sr===row && sc===col){ clearSelection(); return; }
+    // If clicked on another own piece, just change selection silently (no "invalid move" alert)
+    if(piece && piece.color===currentPlayer){
+      setSelectedPiece(row,col);
+      return;
+    }
+    if(isValidMove(sr,sc,row,col)){
+      // push history with algebraic-like notation e.g. e2-e4 or Nf3
+      const moving = board[sr][sc];
+      const target = board[row][col];
+      const fromAlg = coordToAlg(sr,sc), toAlg = coordToAlg(row,col);
+      const san = (pieceLetter(moving) || '') + fromAlg + '-' + toAlg;
+      moveHistory.push({ from:{row:sr,col:sc}, to:{row:row,col:col}, piece:moving, captured: target, san });
+      // handle capture record
+      if(target){ captured[target.color].push(target); }
+      movePiece(sr,sc,row,col);
+      clearSelection();
+      checkGameStatus();
+      updateMoveList();
+      updateCapturedDisplay();
+
+      // اگر حالت بازی با هوش مصنوعی است و نوبت سیاه است، حرکت هوش مصنوعی را انجام بده
+      if(gameMode.startsWith('ai-') && currentPlayer === BLACK && !gameOver) {
+        setTimeout(makeAIMove, 500);
+      }
+    } else {
+      // only show invalid-move alert when the user actually attempted an illegal move (not when clicking own piece)
+      showAlert('این حرکت مجاز نیست!');
+      clearSelection();
+    }
+  } else {
+    if(piece && piece.color===currentPlayer) setSelectedPiece(row,col);
+  }
+}
+
+function movePiece(fromRow,fromCol,toRow,toCol){
+  const piece = board[fromRow][fromCol];
+  if(piece.type===KING && Math.abs(fromCol-toCol)===2){
+    performCastle(fromRow,fromCol,toRow,toCol);
+  } else {
+    // en passant capture
+    if(piece.type===PAWN && enPassantTarget && toRow===enPassantTarget.row && toCol===enPassantTarget.col){
+      const capturedPawnRow = fromRow, capturedPawnCol = toCol;
+      const capturedPiece = board[capturedPawnRow][capturedPawnCol];
+      if(capturedPiece) captured[capturedPiece.color].push(capturedPiece);
+      board[capturedPawnRow][capturedPawnCol]=EMPTY;
+    }
+    board[toRow][toCol]=piece; board[fromRow][fromCol]=EMPTY;
+    if(piece.type===KING) kingPosition[piece.color]={row:toRow,col:toCol};
+    updateBoardDisplay();
+  }
+  if(piece.type===PAWN||piece.type===ROOK||piece.type===KING) piece.hasMoved=true;
+  updateCastlingRights(fromRow,fromCol,toRow,toCol);
+  setEnPassantTarget(fromRow,fromCol,toRow,toCol);
+  checkForPromotion(toRow,toCol);
+  currentPlayer = currentPlayer===WHITE?BLACK:WHITE;
+  // ensure king positions match board after real move to avoid stale check detection
+  syncKingPositions();
+  updateGameStatus();
+  highlightLastMove(fromRow,fromCol,toRow,toCol);
+}
+
+function highlightLastMove(fR,fC,tR,tC){
+  document.querySelectorAll('.cell').forEach(c=>c.classList.remove('last-move'));
+  const c1 = document.querySelector(`[data-row="${fR}"][data-col="${fC}"]`);
+  const c2 = document.querySelector(`[data-row="${tR}"][data-col="${tC}"]`);
+  if(c1) c1.classList.add('last-move'); if(c2) c2.classList.add('last-move');
+}
+
+/* --- castling rights & en passant (kept) --- */
+function updateCastlingRights(fromRow,fromCol,toRow,toCol){
+  const piece = board[toRow][toCol];
+  if(!piece) return;
+  if(piece.type===KING){ castlingRights[piece.color].kingside=false; castlingRights[piece.color].queenside=false; }
+  if(piece.type===ROOK){
+    if(fromCol===0) castlingRights[piece.color].queenside=false;
+    else if(fromCol===7) castlingRights[piece.color].kingside=false;
+  }
+  const lastCaptured = moveHistory.length>0?moveHistory[moveHistory.length-1].captured:null;
+  if(lastCaptured && lastCaptured.type===ROOK){
+    if(toCol===0) castlingRights[lastCaptured.color].queenside=false;
+    else if(toCol===7) castlingRights[lastCaptured.color].kingside=false;
+  }
+}
+function setEnPassantTarget(fromRow,fromCol,toRow,toCol){
+  const piece = board[toRow][toCol];
+  if(piece && piece.type===PAWN && Math.abs(fromRow-toRow)===2){
+    const direction = piece.color===WHITE?-1:1;
+    enPassantTarget = { row: fromRow + direction, col: fromCol };
+  } else enPassantTarget = null;
+}
+
+/* --- promotion (kept original dialog) --- */
+function checkForPromotion(row,col){
+  const piece = board[row][col];
+  if(piece && piece.type===PAWN){
+    if((piece.color===WHITE && row===0) || (piece.color===BLACK && row===7)){
+      promotionPending={row,col};
+      showPromotionDialog(row,col,piece.color);
+    }
+  }
+}
+function showPromotionDialog(row,col,color){
+  const existing = document.getElementById('promotion-dialog'); if(existing) existing.remove();
+  const promotionDialog = document.createElement('div'); promotionDialog.id='promotion-dialog';
+  promotionDialog.style.position='fixed'; promotionDialog.style.top='50%'; promotionDialog.style.left='50%'; promotionDialog.style.transform='translate(-50%,-50%)';
+  promotionDialog.style.backgroundColor='#34495e'; promotionDialog.style.border='3px solid var(--accent)'; promotionDialog.style.borderRadius='10px'; promotionDialog.style.padding='16px'; promotionDialog.style.zIndex='2000';
+  const title = document.createElement('p'); title.textContent='سرباز خود را ارتقا دهید:'; title.style.color='white'; promotionDialog.appendChild(title);
+  const pieces=[QUEEN,ROOK,BISHOP,KNIGHT]; const cont=document.createElement('div'); cont.style.display='flex'; cont.style.gap='12px';
+  pieces.forEach(pt=>{
+    const opt = document.createElement('div'); opt.style.width='60px'; opt.style.height='60px'; opt.style.display='flex'; opt.style.alignItems='center'; opt.style.justifyContent='center';
+    opt.style.fontSize='36px'; opt.style.cursor='pointer'; opt.textContent=PIECE_SYMBOLS[color][pt];
+    opt.addEventListener('click',()=>{
+      board[row][col]={type:pt,color:color}; updateBoardDisplay(); promotionPending=null; promotionDialog.remove(); checkGameStatus(); updateMoveList();
+
+      // اگر حالت بازی با هوش مصنوعی است و نوبت سیاه است، حرکت هوش مصنوعی را انجام بده
+      if(gameMode.startsWith('ai-') && currentPlayer === BLACK && !gameOver) {
+        setTimeout(makeAIMove, 500);
+      }
+    });
+    cont.appendChild(opt);
+  });
+  promotionDialog.appendChild(cont); document.body.appendChild(promotionDialog);
+}
+
+/* --- UI updates --- */
+function updateBoardDisplay(){
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+    if(!cell) continue;
+    const pieceEl = cell.querySelector('.piece');
+    if(board[r][c]){
+      const pd = board[r][c]; pieceEl.textContent = PIECE_SYMBOLS[pd.color][pd.type];
+      pieceEl.style.color = pd.color===WHITE ? 'white' : '#2c3e50';
+      pieceEl.style.textShadow = pd.color===WHITE ? '2px 2px 4px rgba(0,0,0,.5)':'2px 2px 4px rgba(0,0,0,.3)';
+    } else { pieceEl.textContent=''; pieceEl.style.textShadow=''; pieceEl.style.color=''; }
+  }
+}
+
+/* move list UI */
+function updateMoveList(){
+  const ml = document.getElementById('move-list'); ml.innerHTML='';
+  if(moveHistory.length===0){ ml.innerHTML='<div style="text-align:center;color:#bbb">هنوز حرکتی انجام نشده</div>'; return; }
+  moveHistory.forEach((m,i)=>{
+    const div = document.createElement('div'); div.className='move-item';
+    const idx = document.createElement('div'); idx.textContent = (i+1)+'. ' + m.san; idx.style.color='#eee';
+    const info = document.createElement('div'); info.textContent = (m.captured ? 'x' : '');
+    div.appendChild(idx); div.appendChild(info); ml.appendChild(div);
+  });
+  ml.scrollTop = ml.scrollHeight;
+}
+
+/* captured display */
+function updateCapturedDisplay(){
+  const cw = document.getElementById('captured-white'); const cb = document.getElementById('captured-black'); cw.innerHTML=''; cb.innerHTML='';
+  captured[WHITE].forEach(p=>{ const d=document.createElement('div'); d.textContent = PIECE_SYMBOLS[p.color][p.type]; cw.appendChild(d); });
+  captured[BLACK].forEach(p=>{ const d=document.createElement('div'); d.textContent = PIECE_SYMBOLS[p.color][p.type]; cb.appendChild(d); });
+}
+
+/* alert */
+function showAlert(msg){
+  const el = document.getElementById('chess-alert'); el.textContent=msg; el.style.display='block';
+  setTimeout(()=>el.style.display='none',2500);
+}
+
+/* game status update */
+function updateGameStatus(){
+  const status = document.getElementById('chess-game-status'); const ti = document.getElementById('chess-turn-indicator');
+  if(gameOver){ status.textContent='بازی به پایان رسیده است!'; ti.textContent='پایان'; } else if(currentPlayer===WHITE){ status.textContent='نوبت شماست. یک مهره سفید انتخاب کنید.' + (kingInCheck[WHITE]?' (شاه در کیش است!)':''); ti.textContent='سفید'; } else { status.textContent='نوبت حریف. یک مهره سیاه انتخاب کنید.' + (kingInCheck[BLACK]?' (شاه در کیش است!)':''); ti.textContent='سیاه'; }
+}
+
+/* check game end conditions (kept similar to original) */
+function checkGameStatus(){
+  const kingCaptured = isKingCaptured();
+  if(kingCaptured.white){ gameOver=true; showAlert('شاه سفید زده شد! بازیکن سیاه برنده شد!'); updateGameStatus(); return; }
+  if(kingCaptured.black){ gameOver=true; showAlert('شاه سیاه زده شد! بازیکن سفید برنده شد!'); updateGameStatus(); return; }
+  if(isCheckmate(currentPlayer)){ gameOver=true; const winner = currentPlayer===WHITE? 'سیاه':'سفید'; showAlert('کیش و مات! بازیکن ' + winner + ' برنده شد!'); updateGameStatus(); return; }
+  if(isStalemate(currentPlayer)){ gameOver=true; showAlert('پات! بازی مساوی شد!'); updateGameStatus(); return; }
+  checkForCheck();
+  // only show check alert if the current player really is in check AND the king exists on the board
+  if(kingInCheck[currentPlayer] && kingPosition[currentPlayer]) showAlert('شاه شما در کیش است!');
+}
+
+/* undo */
+document.getElementById('chess-undo-move').addEventListener('click',()=>{
+  if(moveHistory.length>0 && !gameOver){
+    const last = moveHistory.pop();
+    board[last.from.row][last.from.col] = last.piece;
+    board[last.to.row][last.to.col] = last.captured;
+    if(last.piece.type===KING) kingPosition[last.piece.color]={row:last.from.row,col:last.from.col};
+    castlingRights = last.castlingRights || castlingRights;
+    enPassantTarget = last.enPassantTarget || null;
+    currentPlayer = currentPlayer===WHITE?BLACK:WHITE;
+    // restore captured lists simply by rebuilding from moveHistory
+    rebuildCapturedFromHistory();
+    // resync king positions to avoid stale check states
+    syncKingPositions();
+    updateBoardDisplay(); updateMoveList(); updateCapturedDisplay(); updateGameStatus(); checkForCheck();
+  }
+});
+
+function rebuildCapturedFromHistory(){
+  captured = { [WHITE]:[], [BLACK]:[] };
+  moveHistory.forEach(m=>{ if(m.captured) captured[m.captured.color].push(m.captured); });
+}
+
+/* new game */
+document.getElementById('chess-new-game').addEventListener('click',()=>{
+  const pd = document.getElementById('promotion-dialog'); if(pd) pd.remove();
+  initializeBoard(); currentPlayer=WHITE; moveHistory=[]; gameOver=false; kingInCheck={[WHITE]:false,[BLACK]:false};
+  kingPosition={[WHITE]:{row:7,col:4},[BLACK]:{row:0,col:4}}; enPassantTarget=null; promotionPending=null; clearSelection();
+  updateGameStatus(); updateMoveList(); updateCapturedDisplay();
+});
+
+/* theme selectors */
+document.querySelectorAll('.chess-theme-option').forEach(opt=>{
+  opt.addEventListener('click',function(){ currentTheme=this.getAttribute('data-theme'); document.querySelectorAll('.chess-theme-option').forEach(o=>o.style.borderColor=o===this?'var(--accent)':'transparent'); for(let r=0;r<8;r++) for(let c=0;c<8;c++){ const cell=document.querySelector(`[data-row="${r}"][data-col="${c}"]`); if(cell) applyThemeToCell(cell,r,c); } updateBoardDisplay(); });
+});
+
+
+/* --- AI Move Functions --- */
+function makeAIMove_old() {
+  if (gameOver || currentPlayer !== BLACK) return;
+
+  const possibleMoves = [];
+
+  // gather all legal moves for black (using isValidMove)
+  for (let fromRow = 0; fromRow < 8; fromRow++) {
+    for (let fromCol = 0; fromCol < 8; fromCol++) {
+      const piece = board[fromRow][fromCol];
+      if (piece && piece.color === BLACK) {
+        for (let toRow = 0; toRow < 8; toRow++) {
+          for (let toCol = 0; toCol < 8; toCol++) {
+            if (isValidMove(fromRow, fromCol, toRow, toCol)) {
+              possibleMoves.push({ fromRow, fromCol, toRow, toCol });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (possibleMoves.length === 0) return;
+
+  // helper: material values
+  const VALUE = { pawn: 10, knight: 30, bishop: 30, rook: 50, queen: 90, king: 900 };
+
+  // helper: simulate a move on a deep-copied board and evaluate resulting position (black positive)
+  function simulateMoveAndEvaluate(move) {
+    // backup globals
+    const backupBoard = board;
+    const backupKingPos = { [WHITE]: {...kingPosition[WHITE]}, [BLACK]: {...kingPosition[BLACK]} };
+    const backupEnPassant = enPassantTarget;
+    const backupCastling = JSON.parse(JSON.stringify(castlingRights));
+    const backupCurrentPlayer = currentPlayer;
+
+    // create a deep copy for board manipulation
+    const boardCopy = JSON.parse(JSON.stringify(backupBoard));
+    // perform move on boardCopy manually
+    const moving = boardCopy[move.fromRow][move.fromCol];
+    const target = boardCopy[move.toRow][move.toCol];
+
+    // handle en passant capture on copy
+    if (moving && moving.type === PAWN && enPassantTarget && move.toRow === enPassantTarget.row && move.toCol === enPassantTarget.col) {
+      const capRow = move.fromRow;
+      const capCol = move.toCol;
+      boardCopy[capRow][capCol] = null;
+    }
+
+    boardCopy[move.toRow][move.toCol] = moving;
+    boardCopy[move.fromRow][move.fromCol] = null;
+    if (moving && moving.type === KING) {
+      // handle castle moves on copy
+      if (Math.abs(move.fromCol - move.toCol) === 2) {
+        const isKingside = move.toCol > move.fromCol;
+        const rookFrom = isKingside ? 7 : 0;
+        const rookTo = isKingside ? move.toCol - 1 : move.toCol + 1;
+        boardCopy[move.fromRow][rookTo] = boardCopy[move.fromRow][rookFrom];
+        boardCopy[move.fromRow][rookFrom] = null;
+      }
+    }
+
+    // temporarily assign globals to the copy for using existing check functions
+    board = boardCopy;
+    // try to update king positions
+    for (let r=0;r<8;r++) for (let c=0;c<8;c++){
+      const p = board[r][c];
+      if (p && p.type===KING) {
+        kingPosition[p.color] = {row:r,col:c};
+      }
+    }
+
+    // evaluate material balance (black positive)
+    let score = 0;
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const p = board[r][c];
+        if (!p) continue;
+        const val = VALUE[p.type] || 0;
+        score += (p.color === BLACK ? val : -val);
+        // small positional bonus towards center
+        if ((r === 3 || r === 4) && (c === 3 || c === 4)) score += (p.color === BLACK ? 3 : -3);
+        else if ((r >= 2 && r <=5) && (c >=2 && c <=5)) score += (p.color === BLACK ? 1 : -1);
+      }
+    }
+
+    // bonus if move gives check to white king
+    const givesCheck = isKingInCheck(WHITE);
+    if (givesCheck) score += 50;
+
+    // penalty if our king is in check after move
+    const ourInCheck = isKingInCheck(BLACK);
+    if (ourInCheck) score -= 500;
+
+    // restore globals
+    board = backupBoard;
+    kingPosition[WHITE] = backupKingPos[WHITE];
+    kingPosition[BLACK] = backupKingPos[BLACK];
+    enPassantTarget = backupEnPassant;
+    castlingRights = backupCastling;
+    currentPlayer = backupCurrentPlayer;
+
+    return { score, boardCopy };
+  }
+
+  // Helper to compute best immediate capture available to White from a given board copy.
+  function bestWhiteImmediateCapture(boardCopy) {
+    const backupBoard = board;
+    const backupCurrentPlayer = currentPlayer;
+    board = boardCopy;
+    currentPlayer = WHITE;
+    let bestCap = 0;
+    for (let fr=0; fr<8; fr++) {
+      for (let fc=0; fc<8; fc++) {
+        const p = board[fr][fc];
+        if (!p || p.color!==WHITE) continue;
+        for (let tr=0; tr<8; tr++) {
+          for (let tc=0; tc<8; tc++) {
+            if (!isValidMove(fr,fc,tr,tc)) continue;
+            const tgt = board[tr][tc];
+            if (tgt && tgt.color===BLACK) {
+              const val = VALUE[tgt.type] || 0;
+              if (val > bestCap) bestCap = val;
+            }
+          }
+        }
+      }
+    }
+    board = backupBoard;
+    currentPlayer = backupCurrentPlayer;
+    return bestCap;
+  }
+
+  // AI selection strategy by difficulty
+  let selectedMove = null;
+
+  if (gameMode === 'ai-easy') {
+    // EASY now uses the previous "hard" policy: choose the move with best 1-ply evaluation.
+    let bestScore = -Infinity;
+    let bestMoves = [];
+    for (const m of possibleMoves) {
+      const { score } = simulateMoveAndEvaluate(m);
+      if (score > bestScore) { bestScore = score; bestMoves = [m]; }
+      else if (score === bestScore) bestMoves.push(m);
+    }
+    selectedMove = bestMoves[Math.floor(Math.random()*bestMoves.length)];
+  } else if (gameMode === 'ai-medium') {
+    // MEDIUM: stronger than previous hard — approximate 2-ply by preferring high-value captures
+    // but also penalizing positions where White would have a strong immediate capture.
+    let bestScore = -Infinity;
+    let bestMoves = [];
+    for (const m of possibleMoves) {
+      const res = simulateMoveAndEvaluate(m);
+      let score = res.score;
+      // compute opponent best immediate capture on resulting board (approximate reply)
+      const oppBest = bestWhiteImmediateCapture(res.boardCopy);
+      // penalize moves that allow strong capture and reward captures of material
+      score -= oppBest * 0.8;
+      if (score > bestScore) { bestScore = score; bestMoves = [m]; }
+      else if (score === bestScore) bestMoves.push(m);
+    }
+    selectedMove = bestMoves[Math.floor(Math.random()*bestMoves.length)];
+  } else {
+    // ai-hard: 2-ply minimax-like selection (choose move that maximizes worst-case after White's best reply)
+    let bestScore = -Infinity;
+    let bestMoves = [];
+    for (const m of possibleMoves) {
+      const res = simulateMoveAndEvaluate(m);
+      // approximate opponent replies: find all legal white moves on res.boardCopy and take the maximum evaluation (worst-case for us)
+      const backupBoard = board;
+      const backupCurrentPlayer = currentPlayer;
+      board = res.boardCopy;
+      currentPlayer = WHITE;
+      let worstForBlack = Infinity; // we want to maximize this worst-case (minimal score for black)
+      // gather white replies
+      const whiteReplies = [];
+      for (let fr=0; fr<8; fr++) for (let fc=0; fc<8; fc++){
+        const piece = board[fr][fc];
+        if (!piece || piece.color!==WHITE) continue;
+        for (let tr=0; tr<8; tr++) for (let tc=0; tc<8;tc++){
+          if (isValidMove(fr,fc,tr,tc)) whiteReplies.push({ fromRow: fr, fromCol: fc, toRow: tr, toCol: tc });
+        }
+      }
+      // if no replies (shouldn't happen), treat as res.score
+      if (whiteReplies.length===0) {
+        worstForBlack = res.score;
+      } else {
+        // evaluate each white reply quickly using simulateMoveAndEvaluate but we must translate moves on the original board state;
+        // create temporary move objects relative to res.boardCopy by applying them with the helper simulate function that accepts a boardCopy.
+        for (const wr of whiteReplies) {
+          // create a temporary move on the res.boardCopy and evaluate resulting position from black's perspective
+          // We'll simulate by constructing a move that applied to res.boardCopy and then evaluate material with black positive.
+          // To reuse simulateMoveAndEvaluate, we temporarily set the global board to res.boardCopy, then perform the white move on a deep copy.
+          const backupBoard2 = board;
+          board = JSON.parse(JSON.stringify(res.boardCopy));
+          // perform white move on this copy
+          const moving = board[wr.fromRow][wr.fromCol];
+          board[wr.toRow][wr.toCol] = moving;
+          board[wr.fromRow][wr.fromCol] = null;
+          // evaluate material on this board
+          // compute score_black = material(black) - material(white)
+          let scoreAfter = 0;
+          for (let r=0;r<8;r++) for (let c=0;c<8;c++){
+            const p = board[r][c];
+            if (!p) continue;
+            const val = VALUE[p.type] || 0;
+            scoreAfter += (p.color === BLACK ? val : -val);
+            if ((r === 3 || r === 4) && (c === 3 || c === 4)) scoreAfter += (p.color === BLACK ? 3 : -3);
+            else if ((r >= 2 && r <=5) && (c >=2 && c <=5)) scoreAfter += (p.color === BLACK ? 1 : -1);
+          }
+          // adjust for checks
+          // temporarily set kingPosition for evaluation
+          // find kings
+          let whiteKingPos = null, blackKingPos = null;
+          for (let r=0;r<8;r++) for (let c=0;c<8;c++){
+            const p = board[r][c];
+            if (p && p.type===KING) { if (p.color===WHITE) whiteKingPos={row:r,col:c}; else blackKingPos={row:r,col:c}; }
+          }
+          // rudimentary check detection using existing isKingInCheck by temporarily assigning globals
+          const savedBoardForCheck = board;
+          const savedGlobalBoard = backupBoard;
+          // assign
+          const savedGlobalBoard2 = backupBoard2;
+          board = savedBoardForCheck;
+          if (whiteKingPos) kingPosition[WHITE] = {row:whiteKingPos.row,col:whiteKingPos.col};
+          if (blackKingPos) kingPosition[BLACK] = {row:blackKingPos.row,col:blackKingPos.col};
+          const givesCheckToBlack = isKingInCheck(BLACK);
+          const givesCheckToWhite = isKingInCheck(WHITE);
+          if (givesCheckToBlack) scoreAfter -= 500;
+          if (givesCheckToWhite) scoreAfter += 50;
+          // restore
+          board = backupBoard2;
+
+          if (scoreAfter < worstForBlack) worstForBlack = scoreAfter;
+          // small early cutoff: if worstForBlack already very low relative to bestScore, we can break
+          if (worstForBlack < bestScore - 200) break;
+        }
+      }
+
+      // restore global board
+      board = backupBoard;
+      currentPlayer = backupCurrentPlayer;
+
+      // choose move by maximizing the worst-case score
+      if (worstForBlack === Infinity) worstForBlack = res.score;
+      if (worstForBlack > bestScore) { bestScore = worstForBlack; bestMoves = [m]; }
+      else if (worstForBlack === bestScore) bestMoves.push(m);
+    }
+
+    selectedMove = bestMoves[Math.floor(Math.random()*bestMoves.length)];
+  }
+
+  // execute selected move if found
+  if (selectedMove) {
+    const { fromRow, fromCol, toRow, toCol } = selectedMove;
+    const moving = board[fromRow][fromCol];
+    const target = board[toRow][toCol];
+    const fromAlg = coordToAlg(fromRow, fromCol), toAlg = coordToAlg(toRow, toCol);
+    const san = (pieceLetter(moving) || '') + fromAlg + '-' + toAlg;
+    moveHistory.push({ from: {row: fromRow, col: fromCol}, to: {row: toRow, col: toCol}, piece: moving, captured: target, san });
+
+    if (target) {
+      captured[target.color].push(target);
+    }
+
+    movePiece(fromRow, fromCol, toRow, toCol);
+    checkGameStatus();
+    updateMoveList();
+    updateCapturedDisplay();
+  }
+}
+
+
+
+/* === Stockfish integration (wasm) ===
+   This block provides functions to init Stockfish worker and ask for moves.
+   Note: Do NOT include <script> tags here because we're already inside a <script> block.
+*/
+let stockfishWorker = null;
+let stockfishReady = false;
+let stockfishBusy = false;
+
+function initStockfish(){
+  stockfishReady = false; stockfishBusy = false;
+  const candidates = ['stockfish.wasm.js','stockfish.js'];
+  function tryLoad(idx){
+    if(idx>=candidates.length){ console.warn('Stockfish files not found locally.'); return; }
+    try {
+      stockfishWorker = new Worker(candidates[idx]);
+      stockfishWorker.onmessage = (e) => {
+        const data = (typeof e.data === 'string')? e.data : (e.data && e.data.data ? e.data.data : '');
+        if(!data) return;
+        if(data.indexOf('uciok')!==-1) { stockfishWorker.postMessage('isready'); }
+        else if(data.indexOf('readyok')!==-1){ stockfishReady = true; console.log('Stockfish ready'); }
+        else if(data.startsWith('bestmove')){
+          const parts = data.split(' ');
+          const mv = parts[1];
+          if(mv && mv.length>=4){
+            const from = mv.slice(0,2); const to = mv.slice(2,4);
+            const fcol = 'abcdefgh'.indexOf(from[0]); const frow = 8 - parseInt(from[1]);
+            const tcol = 'abcdefgh'.indexOf(to[0]); const trow = 8 - parseInt(to[1]);
+            if(board[frow] && board[frow][fcol] && board[frow][fcol].color===BLACK){
+              const moving = board[frow][fcol]; const target = board[trow][tcol];
+              moveHistory.push({ from:{row:frow,col:fcol}, to:{row:trow,col:tcol}, piece:moving, captured: target, san: (pieceLetter(moving)||'')+coordToAlg(frow,fcol)+'-'+coordToAlg(trow,tcol) });
+              if(target) captured[target.color].push(target);
+              movePiece(frow,fcol,trow,tcol);
+              checkGameStatus(); updateMoveList(); updateCapturedDisplay();
+            } else {
+              console.warn('Stockfish suggested invalid move or turn mismatch', mv);
+            }
+          }
+          stockfishBusy = false;
+        }
+      };
+      stockfishWorker.postMessage('uci');
+      console.log('Attempting to load Stockfish from', candidates[idx]);
+    } catch(e){
+      console.warn('Failed to load', candidates[idx], e);
+      tryLoad(idx+1);
+    }
+  }
+  tryLoad(0);
+}
+
+// ask Stockfish for a bestmove with movetime ms
+
+
+function setStockfishSkill(mode){
+  if(!stockfishWorker) return;
+  let skill = 10;
+  if(mode==='ai-pro') skill = 15;
+  if(mode==='ai-grandmaster') skill = 20;
+  stockfishWorker.postMessage('setoption name Skill Level value ' + skill);
+}
+
+
+
+
+function configureStockfish(mode){
+  if(!stockfishWorker) return;
+  try { stockfishWorker.postMessage('setoption name Skill Level value 0'); } catch(e){}
+  try { stockfishWorker.postMessage('setoption name Threads value 1'); } catch(e){}
+  try { stockfishWorker.postMessage('setoption name Hash value 1024'); } catch(e){}
+  let depth = 12; let time = 3000;
+  if(mode==='ai-master'){ depth = 12; time = 3000; }
+  if(mode==='ai-gm'){ depth = 18; time = 5000; }
+  if(mode==='ai-supergm'){ depth = 512; time = 600000; } // God Mode
+  window.sf_depth = depth;
+  window.sf_time = time;
+}
+
+function askStockfishForMove(ms){
+  if(!stockfishWorker || !stockfishReady) { console.log('Stockfish not ready'); return false; }
+  if(stockfishBusy) { console.log('Stockfish busy'); return false; }
+  stockfishBusy = true;
+  let moves = '';
+  for(let i=0;i<moveHistory.length;i++){
+    const m = moveHistory[i];
+    moves += ' ' + coordToAlg(m.from.row,m.from.col) + coordToAlg(m.to.row,m.to.col);
+  }
+  stockfishWorker.postMessage('position startpos moves' + moves);
+  stockfishWorker.postMessage('go movetime ' + Math.max(20, Math.floor(ms)));
+  return true;
+}
+
+// initialize on load
+try {
+  window.addEventListener('load', ()=>{ initStockfish(); });
+} catch(e){
+  console.warn('initStockfish setup failed', e);
+}
+
+// wrapper makeAIMove that prefers Stockfish when selected
+function makeAIMove() {
+  if (gameOver || currentPlayer !== BLACK) return;
+  if (gameMode==='ai-normal' || gameMode==='ai-pro' || gameMode==='ai-grandmaster') {
+    setStockfishSkill(gameMode);
+  configureStockfish(gameMode);
+  const params = (typeof AI_PARAMS !== 'undefined' && AI_PARAMS['ai-pro'])? AI_PARAMS['ai-pro'] : { timePerMove: window.sf_time || 2000 };
+    const ok = askStockfishForMove(params.timePerMove);
+    if(!ok){
+      // fallback to internal AI
+      if(typeof makeAIMove_old === 'function') { makeAIMove_old(); return; }
+      return;
+    }
+    return;
+  } else {
+    // non-stockfish modes: call original AI
+    if(typeof makeAIMove_old === 'function') makeAIMove_old();
+  }
+}
+
+
+
+/* --- Game Mode Selection --- */
+document.getElementById('toggle-game-mode').addEventListener('click', () => {
+  document.getElementById('game-mode-dialog').style.display = 'block';
+});
+
+document.getElementById('apply-game-mode').addEventListener('click', () => {
+  const modeSelect = document.getElementById('game-mode');
+  gameMode = modeSelect.value;
+  document.getElementById('game-mode-dialog').style.display = 'none';
+
+  // شروع بازی جدید با حالت انتخاب شده
+  document.getElementById('chess-new-game').click();
+
+  showAlert(`حالت بازی تغییر کرد به: ${modeSelect.options[modeSelect.selectedIndex].text}`);
+});
+
+document.getElementById('close-game-mode').addEventListener('click', () => {
+  document.getElementById('game-mode-dialog').style.display = 'none';
+});
+
+// --- toggle coordinates ---
+let coordsVisible = true;
+document.getElementById('toggle-coordinates').addEventListener('click', () => {
+  coordsVisible = !coordsVisible;
+  document.querySelectorAll('.coord').forEach(el => {
+    el.style.display = coordsVisible ? 'block' : 'none';
+  });
+  document.getElementById('toggle-coordinates').textContent = coordsVisible ? 'مختصات: روشن' : 'مختصات: خاموش';
+});
+
+// --- toggle move hints ---
+document.getElementById('toggle-move-hints').addEventListener('click', () => {
+  moveHintsVisible = !moveHintsVisible;
+  document.getElementById('toggle-move-hints').textContent = moveHintsVisible ? 'راهنما: روشن' : 'راهنما: خاموش';
+
+  // اگر راهنما خاموش شد و مهره‌ای انتخاب شده، هایلایت‌ها را پاک کن
+  if (!moveHintsVisible) {
+    clearMoveHighlights();
+  } else if (selectedPiece) {
+    // اگر راهنما روشن شد و مهره‌ای انتخاب شده، هایلایت‌ها را نشان بده
+    showPossibleMoves(selectedPiece[0], selectedPiece[1]);
+  }
+});
+
+/* initial setup */
+initializeBoard();
+window.addEventListener('resize', initializeBoard);
+</script>
+</body>
+</html>
