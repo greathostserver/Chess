@@ -1,0 +1,201 @@
+:root {
+    --square-light: #f0d9b5;
+    --square-dark: #b58863;
+    --square-light-dark: #d7b899;
+    --square-dark-dark: #a57550;
+}
+
+[data-theme="dark"] {
+    --square-light: #769656;
+    --square-dark: #eeeed2;
+}
+
+[data-theme="blue"] {
+    --square-light: #b0c4de;
+    --square-dark: #4682b4;
+}
+
+[data-theme="green"] {
+    --square-light: #e8edcc;
+    --square-dark: #779556;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.chess-board {
+    width: 560px;
+    height: 560px;
+    margin: 0 auto;
+    border: 10px solid #333;
+    border-radius: 5px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    background: white;
+}
+
+.chess-board-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.board-row {
+    display: flex;
+}
+
+.square {
+    width: 70px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.square.light {
+    background-color: var(--square-light);
+}
+
+.square.dark {
+    background-color: var(--square-dark);
+}
+
+.square.selected {
+    background-color: #ffeb3b !important;
+}
+
+.square.possible-move {
+    background-color: #a5d6a7 !important;
+}
+
+.square.possible-capture::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: rgba(255, 0, 0, 0.3);
+    border: 2px solid rgba(255, 0, 0, 0.5);
+}
+
+.piece {
+    font-size: 50px;
+    cursor: grab;
+    transition: transform 0.2s ease;
+    user-select: none;
+}
+
+.piece.dragging {
+    transform: scale(1.1);
+    z-index: 1000;
+}
+
+.control-panel {
+    padding: 10px;
+}
+
+.move-history {
+    max-height: 400px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+}
+
+.move-history .move {
+    padding: 5px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+}
+
+.move-history .move:hover {
+    background-color: #f8f9fa;
+}
+
+.timer {
+    font-family: 'Courier New', monospace;
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.game-status {
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+
+.coordinates {
+    position: absolute;
+    font-size: 12px;
+    color: rgba(0,0,0,0.7);
+    pointer-events: none;
+}
+
+.coord-file {
+    bottom: 2px;
+    right: 4px;
+}
+
+.coord-rank {
+    top: 2px;
+    left: 4px;
+}
+
+/* انیمیشن حرکت */
+@keyframes movePiece {
+    from {
+        transform: scale(1);
+    }
+    to {
+        transform: scale(1.05);
+    }
+}
+
+.piece.moving {
+    animation: movePiece 0.3s ease-in-out;
+}
+
+/* ریسپانسیو */
+@media (max-width: 768px) {
+    .chess-board {
+        width: 320px;
+        height: 320px;
+    }
+    
+    .square {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .piece {
+        font-size: 30px;
+    }
+    
+    .container-fluid {
+        padding: 5px;
+    }
+}
+
+/* استایل برای مهره‌های سفید و سیاه */
+.piece.white { color: #fff; text-shadow: 1px 1px 2px #000; }
+.piece.black { color: #000; text-shadow: 1px 1px 2px #fff; }
+
+/* نمایش ارزیابی */
+.evaluation-bar {
+    width: 100%;
+    height: 20px;
+    background: linear-gradient(to right, #000 0%, #fff 100%);
+    border-radius: 10px;
+    margin: 10px 0;
+    position: relative;
+}
+
+.evaluation-value {
+    height: 100%;
+    background: rgba(255, 255, 255, 0.5);
+    transition: width 0.3s ease;
+}
