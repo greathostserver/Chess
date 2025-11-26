@@ -6,7 +6,8 @@ class ChessGame {
         this.gameStatusElement = document.getElementById('gameStatus');
         this.evaluationElement = document.getElementById('evaluation');
         
-        this.stockfish = new Worker('js/stockfish.js');
+        // استفاده از Stockfish از CDN
+        this.stockfish = new Worker('https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js');
         this.stockfish.onmessage = this.handleStockfishMessage.bind(this);
         
         this.isPlayerWhite = true;
@@ -14,6 +15,7 @@ class ChessGame {
         this.selectedSquare = null;
         this.possibleMoves = [];
         this.boardFlipped = false;
+        this.draggedPiece = null;
         
         this.initializeEventListeners();
         this.initializeStockfish();
@@ -46,21 +48,89 @@ class ChessGame {
         
         // تایمر
         document.getElementById('startTimer').addEventListener('click', () => this.startTimer());
+        
+        // Drag and Drop
+        this.setupDragAndDrop();
+    }
+
+    setupDragAndDrop() {
+        this.boardElement.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('piece')) {
+                const square = e.target.parentElement.dataset.square;
+                const piece = this.chess.get(square);
+                
+                if (piece && this.gameActive && 
+                    ((piece.color === 'w' && this.isPlayerWhite) || 
+                     (piece.color === 'b' && !this.isPlayerWhite))) {
+                    this.draggedPiece = square;
+                    e.target.classList.add('dragging');
+                    e.dataTransfer.setData('text/plain', square);
+                    this.handleSquareClick(square);
+                } else {
+                    e.preventDefault();
+                }
+            }
+        });
+
+        this.boardElement.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (e.target.classList.contains('square')) {
+                e.target.classList.add('drag-over');
+            }
+        });
+
+        this.boardElement.addEventListener('dragleave', (e) => {
+            e.target.classList.remove('drag-over');
+        });
+
+        this.boardElement.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.target.classList.remove('drag-over');
+            
+            if (e.target.classList.contains('square') && this.draggedPiece) {
+                const fromSquare = this.draggedPiece;
+                const toSquare = e.target.dataset.square;
+                this.draggedPiece = null;
+                
+                const move = this.tryMove(fromSquare, toSquare);
+                if (move) {
+                    this.makeMove(move);
+                }
+            }
+            
+            // حذف حالت dragging از تمام مهره‌ها
+            document.querySelectorAll('.piece.dragging').forEach(piece => {
+                piece.classList.remove('dragging');
+            });
+        });
+
+        this.boardElement.addEventListener('dragend', (e) => {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.square.drag-over').forEach(square => {
+                square.classList.remove('drag-over');
+            });
+        });
     }
 
     initializeStockfish() {
         this.stockfish.postMessage('uci');
         this.setStockfishLevel(2); // سطح متوسط پیش‌فرض
+        
+        // تنظیمات اولیه Stockfish
+        setTimeout(() => {
+            this.stockfish.postMessage('setoption name Contempt value 0');
+            this.stockfish.postMessage('setoption name Min Split Depth value 0');
+            this.stockfish.postMessage('setoption name Threads value 1');
+            this.stockfish.postMessage('setoption name Hash value 16');
+        }, 100);
     }
 
     setStockfishLevel(level) {
         const depths = {1: 2, 2: 4, 3: 6, 4: 8};
         const depth = depths[level] || 4;
         
-        this.stockfish.postMessage(`setoption name Skill Level value ${level - 1}`);
-        this.stockfish.postMessage(`setoption name Contempt value 0`);
-        this.stockfish.postMessage(`setoption name Skill Level Maximum Error value 0.1`);
-        this.stockfish.postMessage(`setoption name Skill Level Probability value 0.1`);
+        const skillLevel = Math.max(0, Math.min(20, (level - 1) * 5));
+        this.stockfish.postMessage(`setoption name Skill Level value ${skillLevel}`);
     }
 
     drawBoard() {
@@ -120,22 +190,12 @@ class ChessGame {
                 const piece = this.chess.get(square);
                 
                 if (piece) {
-                    const pieceElement = document.createElement('div');
-                    pieceElement.className = `piece ${piece.color}`;
-                    pieceElement.textContent = this.getPieceSymbol(piece.type, piece.color);
-                    pieceElement.draggable = true;
-                    
-                    pieceElement.addEventListener('dragstart', (e) => {
-                        if (this.gameActive && 
-                            ((piece.color === 'w' && this.isPlayerWhite) || 
-                             (piece.color === 'b' && !this.isPlayerWhite))) {
-                            e.dataTransfer.setData('text/plain', square);
-                            this.handleSquareClick(square);
-                        }
-                    });
-                    
                     const squareElement = this.getSquareElement(square);
                     if (squareElement) {
+                        const pieceElement = document.createElement('div');
+                        pieceElement.className = `piece ${piece.color}`;
+                        pieceElement.textContent = this.getPieceSymbol(piece.type, piece.color);
+                        pieceElement.draggable = true;
                         squareElement.appendChild(pieceElement);
                     }
                 }
@@ -198,63 +258,118 @@ class ChessGame {
     }
 
     tryMove(from, to) {
-        const moves = this.chess.moves({ verbose: true });
-        return moves.find(move => move.from === from && move.to === to);
+        try {
+            const move = {
+                from: from,
+                to: to,
+                promotion: 'q' // پیش‌فرض ارتقا به وزیر
+            };
+            
+            // بررسی حرکت معتبر
+            const possibleMoves = this.chess.moves({ square: from, verbose: true });
+            const validMove = possibleMoves.find(m => m.from === from && m.to === to);
+            
+            return validMove || null;
+        } catch (error) {
+            return null;
+        }
     }
 
     makeMove(move) {
-        this.chess.move(move);
-        this.selectedSquare = null;
-        this.possibleMoves = [];
-        this.clearHighlights();
-        this.updatePieces();
-        this.updateMoveHistory();
-        this.updateGameStatus();
-        
-        if (this.gameActive) {
-            this.getEvaluation();
-            
-            // اگر نوبت هوش مصنوعی است
-            if ((this.chess.turn() === 'w' && !this.isPlayerWhite) || 
-                (this.chess.turn() === 'b' && this.isPlayerWhite)) {
-                this.makeAIMove();
+        try {
+            const result = this.chess.move(move);
+            if (result) {
+                this.selectedSquare = null;
+                this.possibleMoves = [];
+                this.clearHighlights();
+                this.updatePieces();
+                this.updateMoveHistory();
+                this.updateGameStatus();
+                
+                if (this.gameActive) {
+                    this.getEvaluation();
+                    
+                    // اگر نوبت هوش مصنوعی است
+                    if ((this.chess.turn() === 'w' && !this.isPlayerWhite) || 
+                        (this.chess.turn() === 'b' && this.isPlayerWhite)) {
+                        setTimeout(() => this.makeAIMove(), 500);
+                    }
+                }
             }
+        } catch (error) {
+            console.error('خطا در انجام حرکت:', error);
         }
     }
 
     makeAIMove() {
+        if (!this.gameActive) return;
+        
         this.stockfish.postMessage(`position fen ${this.chess.fen()}`);
-        this.stockfish.postMessage('go depth 8');
+        
+        // تنظیم زمان براساس سطح
+        const level = parseInt(document.getElementById('aiLevel').value);
+        const times = {1: 1000, 2: 2000, 3: 3000, 4: 5000};
+        const time = times[level] || 2000;
+        
+        this.stockfish.postMessage(`go movetime ${time}`);
     }
 
     handleStockfishMessage(event) {
         const message = event.data;
         
         if (message.startsWith('bestmove')) {
-            const bestMove = message.split(' ')[1];
-            if (bestMove && bestMove !== 'null') {
-                setTimeout(() => {
-                    const move = this.chess.move({
-                        from: bestMove.substring(0, 2),
-                        to: bestMove.substring(2, 4),
-                        promotion: bestMove.substring(4, 5) || 'q'
-                    });
-                    
-                    if (move) {
-                        this.updatePieces();
-                        this.updateMoveHistory();
-                        this.updateGameStatus();
-                        this.getEvaluation();
-                    }
-                }, 500);
+            const parts = message.split(' ');
+            if (parts.length > 1 && parts[1] !== 'null') {
+                const bestMove = parts[1];
+                this.executeAIMove(bestMove);
             }
-        } else if (message.startsWith('info depth') && message.includes('score cp')) {
-            // پردازش ارزیابی موقعیت
-            const scoreMatch = message.match(/score cp (-?\d+)/);
-            if (scoreMatch) {
-                const score = parseInt(scoreMatch[1]) / 100;
-                this.updateEvaluation(score);
+        } else if (message.startsWith('info') && message.includes('score cp')) {
+            this.processEvaluation(message);
+        } else if (message.startsWith('info') && message.includes('pv')) {
+            this.processHint(message);
+        }
+    }
+
+    executeAIMove(bestMove) {
+        try {
+            const move = {
+                from: bestMove.substring(0, 2),
+                to: bestMove.substring(2, 4),
+                promotion: bestMove.substring(4, 5) || 'q'
+            };
+            
+            const result = this.chess.move(move);
+            if (result) {
+                this.updatePieces();
+                this.updateMoveHistory();
+                this.updateGameStatus();
+                this.getEvaluation();
             }
+        } catch (error) {
+            console.error('خطا در اجرای حرکت هوش مصنوعی:', error);
+        }
+    }
+
+    processEvaluation(message) {
+        const scoreMatch = message.match(/score cp (-?\d+)/);
+        if (scoreMatch) {
+            const score = parseInt(scoreMatch[1]) / 100;
+            this.updateEvaluation(score);
+        }
+    }
+
+    processHint(message) {
+        const pvMatch = message.match(/pv (\S+)/);
+        if (pvMatch) {
+            const bestMove = pvMatch[1];
+            const from = bestMove.substring(0, 2);
+            const to = bestMove.substring(2, 4);
+            
+            // نمایش راهنمایی در Modal
+            const hintModal = new bootstrap.Modal(document.getElementById('hintModal'));
+            document.getElementById('hintText').textContent = 
+                `پیشنهاد حرکت: از ${from} به ${to}`;
+            hintModal.show();
         }
     }
 
@@ -267,14 +382,15 @@ class ChessGame {
 
     highlightPossibleMoves() {
         this.possibleMoves.forEach(move => {
-            const className = move.flags.includes('c') ? 'possible-capture' : 'possible-move';
+            const className = move.flags.includes('c') || move.flags.includes('e') ? 
+                'possible-capture' : 'possible-move';
             this.highlightSquare(move.to, className);
         });
     }
 
     clearHighlights() {
         document.querySelectorAll('.square').forEach(square => {
-            square.classList.remove('selected', 'possible-move', 'possible-capture');
+            square.classList.remove('selected', 'possible-move', 'possible-capture', 'drag-over');
         });
     }
 
@@ -284,22 +400,26 @@ class ChessGame {
         
         for (let i = 0; i < moves.length; i += 2) {
             const moveRow = document.createElement('div');
-            moveRow.className = 'move-row d-flex justify-content-between';
+            moveRow.className = 'move-row d-flex justify-content-between align-items-center mb-1 p-2 border-bottom';
             
             const moveNumber = document.createElement('span');
+            moveNumber.className = 'text-muted me-3';
             moveNumber.textContent = `${Math.floor(i/2) + 1}.`;
-            moveNumber.className = 'text-muted';
             
-            const whiteMove = document.createElement('span');
+            const whiteMove = document.createElement('button');
+            whiteMove.className = 'btn btn-sm btn-outline-primary me-2 flex-fill';
             whiteMove.textContent = moves[i].san;
-            whiteMove.className = 'move';
             whiteMove.addEventListener('click', () => this.showMoveDetails(moves[i]));
             
-            const blackMove = document.createElement('span');
+            const blackMove = document.createElement('button');
+            blackMove.className = 'btn btn-sm btn-outline-dark flex-fill';
+            
             if (moves[i + 1]) {
                 blackMove.textContent = moves[i + 1].san;
-                blackMove.className = 'move';
                 blackMove.addEventListener('click', () => this.showMoveDetails(moves[i + 1]));
+            } else {
+                blackMove.textContent = '...';
+                blackMove.disabled = true;
             }
             
             moveRow.appendChild(moveNumber);
@@ -318,7 +438,7 @@ class ChessGame {
             this.gameActive = false;
         } else if (this.chess.isDraw()) {
             this.gameStatusElement.className = 'alert alert-warning';
-            this.gameStatusElement.textContent = 'بازی مساوی شد!';
+            this.gameStatusElement.textContent = this.getDrawReason();
             this.gameActive = false;
         } else if (this.chess.isCheck()) {
             this.gameStatusElement.className = 'alert alert-warning';
@@ -330,25 +450,32 @@ class ChessGame {
         }
     }
 
+    getDrawReason() {
+        if (this.chess.isStalemate()) return 'پات! بازی مساوی شد.';
+        if (this.chess.isThreefoldRepetition()) return 'تکرار سه‌باره حرکت! بازی مساوی شد.';
+        if (this.chess.isInsufficientMaterial()) return 'ماده ناکافی! بازی مساوی شد.';
+        return 'بازی مساوی شد!';
+    }
+
     updateEvaluation(score) {
         let evaluationText = 'برابر';
         let evaluationClass = 'text-success';
         
         if (score > 2) {
-            evaluationText = `سفید +${score.toFixed(1)}`;
+            evaluationText = `امتیاز سفید: +${score.toFixed(1)}`;
             evaluationClass = 'text-primary';
         } else if (score < -2) {
-            evaluationText = `سیاه +${Math.abs(score).toFixed(1)}`;
+            evaluationText = `امتیاز سیاه: +${Math.abs(score).toFixed(1)}`;
             evaluationClass = 'text-dark';
         } else if (score > 0.5) {
-            evaluationText = `سفید بهتر +${score.toFixed(1)}`;
+            evaluationText = `سفید بهتر: +${score.toFixed(1)}`;
             evaluationClass = 'text-info';
         } else if (score < -0.5) {
-            evaluationText = `سیاه بهتر +${Math.abs(score).toFixed(1)}`;
+            evaluationText = `سیاه بهتر: +${Math.abs(score).toFixed(1)}`;
             evaluationClass = 'text-secondary';
         }
         
-        this.evaluationElement.innerHTML = `<small class="${evaluationClass}">ارزیابی: ${evaluationText}</small>`;
+        this.evaluationElement.innerHTML = `<small class="${evaluationClass}">${evaluationText}</small>`;
     }
 
     getEvaluation() {
@@ -357,12 +484,14 @@ class ChessGame {
     }
 
     getHint() {
+        if (!this.gameActive) return;
+        
         this.stockfish.postMessage(`position fen ${this.chess.fen()}`);
         this.stockfish.postMessage('go depth 6');
         
         setTimeout(() => {
             this.stockfish.postMessage('stop');
-        }, 2000);
+        }, 1000);
     }
 
     newGame() {
@@ -374,15 +503,33 @@ class ChessGame {
         this.updatePieces();
         this.updateMoveHistory();
         this.updateGameStatus();
-        this.evaluationElement.innerHTML = '<small>ارزیابی: برابر</small>';
+        this.evaluationElement.innerHTML = '<small class="text-success">ارزیابی: برابر</small>';
+        
+        // اگر کاربر سیاه بازی می‌کند، هوش مصنوعی حرکت اول را انجام دهد
+        if (!this.isPlayerWhite) {
+            setTimeout(() => this.makeAIMove(), 1000);
+        }
     }
 
     undoMove() {
-        this.chess.undo();
-        this.chess.undo(); // دو بار undo برای برگرداندن حرکت هوش مصنوعی و حرکت کاربر
-        this.updatePieces();
-        this.updateMoveHistory();
-        this.updateGameStatus();
+        try {
+            // حداقل دو حرکت برای پس‌گیری وجود دارد
+            if (this.chess.history().length >= 2) {
+                this.chess.undo();
+                this.chess.undo();
+                this.updatePieces();
+                this.updateMoveHistory();
+                this.updateGameStatus();
+                this.getEvaluation();
+            } else if (this.chess.history().length === 1) {
+                this.chess.undo();
+                this.updatePieces();
+                this.updateMoveHistory();
+                this.updateGameStatus();
+            }
+        } catch (error) {
+            console.error('خطا در پس‌گیری حرکت:', error);
+        }
     }
 
     flipBoard() {
@@ -394,15 +541,19 @@ class ChessGame {
         const gameData = {
             fen: this.chess.fen(),
             pgn: this.chess.pgn(),
-            moves: this.chess.history()
+            moves: this.chess.history(),
+            timestamp: new Date().toISOString(),
+            playerColor: this.isPlayerWhite ? 'white' : 'black'
         };
         
-        const blob = new Blob([JSON.stringify(gameData)], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(gameData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `chess-game-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
 
@@ -413,17 +564,29 @@ class ChessGame {
         
         input.onchange = (e) => {
             const file = e.target.files[0];
+            if (!file) return;
+            
             const reader = new FileReader();
             
             reader.onload = (event) => {
                 try {
                     const gameData = JSON.parse(event.target.result);
-                    this.chess.load(gameData.fen);
-                    this.updatePieces();
-                    this.updateMoveHistory();
-                    this.updateGameStatus();
+                    
+                    if (gameData.fen) {
+                        this.chess.load(gameData.fen);
+                        if (gameData.playerColor) {
+                            this.isPlayerWhite = gameData.playerColor === 'white';
+                            document.getElementById('playerColor').value = gameData.playerColor;
+                        }
+                        
+                        this.updatePieces();
+                        this.updateMoveHistory();
+                        this.updateGameStatus();
+                        this.getEvaluation();
+                    }
                 } catch (error) {
-                    alert('خطا در بارگذاری بازی!');
+                    alert('خطا در بارگذاری بازی! فایل معتبر نیست.');
+                    console.error('Error loading game:', error);
                 }
             };
             
@@ -434,42 +597,79 @@ class ChessGame {
     }
 
     startTimer() {
-        // پیاده‌سازی تایمر ساده
         let whiteTime = 600; // 10 دقیقه
         let blackTime = 600;
+        let timerInterval = null;
         
-        const timer = setInterval(() => {
+        const updateTimerDisplay = () => {
+            document.getElementById('whiteTime').textContent = 
+                `${Math.floor(whiteTime/60)}:${(whiteTime%60).toString().padStart(2, '0')}`;
+            document.getElementById('blackTime').textContent = 
+                `${Math.floor(blackTime/60)}:${(blackTime%60).toString().padStart(2, '0')}`;
+        };
+        
+        const stopTimer = () => {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        };
+        
+        stopTimer(); // توقف تایمر قبلی
+        
+        timerInterval = setInterval(() => {
             if (!this.gameActive) {
-                clearInterval(timer);
+                stopTimer();
                 return;
             }
             
             if (this.chess.turn() === 'w') {
                 whiteTime--;
-                document.getElementById('whiteTime').textContent = 
-                    `${Math.floor(whiteTime/60)}:${(whiteTime%60).toString().padStart(2, '0')}`;
             } else {
                 blackTime--;
-                document.getElementById('blackTime').textContent = 
-                    `${Math.floor(blackTime/60)}:${(blackTime%60).toString().padStart(2, '0')}`;
             }
             
-            if (whiteTime <= 0 || blackTime <= 0) {
-                clearInterval(timer);
+            updateTimerDisplay();
+            
+            if (whiteTime <= 0) {
+                stopTimer();
                 this.gameStatusElement.className = 'alert alert-danger';
-                this.gameStatusElement.textContent = 'وقت تمام شد!';
+                this.gameStatusElement.textContent = 'وقت سفید تمام شد! سیاه برنده شد.';
+                this.gameActive = false;
+            } else if (blackTime <= 0) {
+                stopTimer();
+                this.gameStatusElement.className = 'alert alert-danger';
+                this.gameStatusElement.textContent = 'وقت سیاه تمام شد! سفید برنده شد.';
                 this.gameActive = false;
             }
         }, 1000);
+        
+        updateTimerDisplay();
     }
 
     showMoveDetails(move) {
-        // نمایش جزئیات حرکت
-        alert(`حرکت: ${move.san}\nاز: ${move.from}\nبه: ${move.to}\nنوع: ${move.flags}`);
+        const modal = new bootstrap.Modal(document.getElementById('hintModal'));
+        document.getElementById('hintText').textContent = 
+            `حرکت: ${move.san}\nاز: ${move.from}\nبه: ${move.to}\nنوع: ${this.getMoveType(move.flags)}`;
+        modal.show();
+    }
+
+    getMoveType(flags) {
+        const types = {
+            'n': 'حرکت معمولی',
+            'b': 'حرکت اسب',
+            'e': 'ان پاسان',
+            'c': 'زدن مهره',
+            'p': 'ارتقا پیاده',
+            'k': 'قلعه کوتاه',
+            'q': 'قلعه بلند'
+        };
+        
+        return types[flags] || 'حرکت ناشناخته';
     }
 }
 
 // راه‌اندازی بازی وقتی صفحه لود شد
 document.addEventListener('DOMContentLoaded', () => {
-    new ChessGame();
+    window.chessGame = new ChessGame();
 });
