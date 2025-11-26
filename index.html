@@ -35,12 +35,12 @@
         }
 
         .chess-board {
-            width: 400px;
-            height: 400px;
+            width: 480px;
+            height: 480px;
             margin: 0 auto;
-            border: 10px solid #333;
-            border-radius: 5px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 15px solid #333;
+            border-radius: 8px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
             background: white;
         }
 
@@ -57,7 +57,8 @@
             justify-content: center;
             position: relative;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
+            font-weight: bold;
         }
 
         .square.light {
@@ -70,58 +71,71 @@
 
         .square.selected {
             background-color: #ffeb3b !important;
+            box-shadow: inset 0 0 0 3px #ff9800;
         }
 
         .square.possible-move::after {
             content: '';
             position: absolute;
-            width: 20px;
-            height: 20px;
+            width: 25%;
+            height: 25%;
             border-radius: 50%;
-            background-color: rgba(0, 255, 0, 0.3);
+            background-color: rgba(76, 175, 80, 0.6);
+            border: 2px solid rgba(76, 175, 80, 0.8);
+        }
+
+        .square.possible-capture {
+            background-color: rgba(244, 67, 54, 0.3) !important;
         }
 
         .square.possible-capture::after {
             content: '';
             position: absolute;
-            width: 100%;
-            height: 100%;
-            border: 3px solid rgba(255, 0, 0, 0.5);
-            border-radius: 0;
+            width: 85%;
+            height: 85%;
+            border: 3px solid rgba(244, 67, 54, 0.8);
+            border-radius: 50%;
             background-color: transparent;
         }
 
         .piece {
-            font-size: 30px;
+            font-size: 35px;
             cursor: grab;
-            transition: transform 0.2s ease;
+            transition: all 0.2s ease;
             user-select: none;
             width: 100%;
             height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
+            z-index: 10;
+        }
+
+        .piece:hover {
+            transform: scale(1.1);
         }
 
         .piece.dragging {
-            transform: scale(1.1);
+            transform: scale(1.2);
             z-index: 1000;
         }
 
         .piece.white { 
-            color: #fff; 
-            text-shadow: 1px 1px 2px #000; 
+            color: #ffffff; 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
         }
         .piece.black { 
-            color: #000; 
-            text-shadow: 1px 1px 2px #fff; 
+            color: #000000; 
+            text-shadow: 2px 2px 4px rgba(255,255,255,0.8);
         }
 
         .coordinates {
             position: absolute;
-            font-size: 10px;
-            color: rgba(0,0,0,0.7);
+            font-size: 12px;
+            font-weight: bold;
+            color: rgba(0,0,0,0.8);
             pointer-events: none;
+            z-index: 5;
         }
 
         .coord-file {
@@ -135,130 +149,555 @@
         }
 
         .control-panel {
-            background: white;
-            border-radius: 10px;
-            padding: 15px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            border: 1px solid rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
         }
 
         .move-history {
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
             font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .move-row {
+            border-bottom: 1px solid #dee2e6;
+            padding: 8px 5px;
+            transition: background-color 0.2s;
+        }
+
+        .move-row:hover {
+            background-color: #e9ecef;
+        }
+
+        .game-title {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
         }
 
         @media (max-width: 768px) {
             .chess-board {
-                width: 320px;
-                height: 320px;
+                width: 350px;
+                height: 350px;
             }
             
             .piece {
-                font-size: 24px;
+                font-size: 28px;
+            }
+            
+            .container {
+                padding: 10px;
             }
         }
     </style>
 </head>
-<body>
+<body data-theme="classic">
     <div class="container">
+        <!-- هدر -->
         <div class="text-center text-white mb-4">
-            <h1><i class="bi bi-chess-knight"></i> شطرنج حرفه‌ای</h1>
-            <p class="lead">با هوش مصنوعی چندسطحی</p>
+            <h1 class="game-title"><i class="bi bi-chess-knight"></i> شطرنج حرفه‌ای</h1>
+            <p class="lead text-light">با هوش مصنوعی چندسطحی - طراحی واکنش‌گرا</p>
         </div>
 
-        <div class="row">
-            <!-- کنترل‌ها -->
-            <div class="col-md-4">
-                <div class="control-panel mb-4">
-                    <h5>تنظیمات بازی</h5>
+        <div class="row g-4">
+            <!-- پنل کنترل سمت راست -->
+            <div class="col-lg-4 col-md-5">
+                <div class="control-panel h-100">
+                    <h4 class="border-bottom pb-2 mb-3">🎮 کنترل بازی</h4>
+                    
                     <div class="mb-3">
-                        <label class="form-label">سطح هوش مصنوعی:</label>
+                        <label class="form-label fw-bold">🔄 سطح هوش مصنوعی:</label>
                         <select id="aiLevel" class="form-select">
-                            <option value="1">مبتدی</option>
-                            <option value="2" selected>متوسط</option>
-                            <option value="3">حرفه‌ای</option>
-                            <option value="4">استاد</option>
+                            <option value="1">🎯 مبتدی (آسان)</option>
+                            <option value="2" selected>⚡ متوسط (پیش‌فرض)</option>
+                            <option value="3">🔥 حرفه‌ای (سخت)</option>
+                            <option value="4">👑 استاد (بسیار سخت)</option>
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">رنگ شما:</label>
+                        <label class="form-label fw-bold">🎨 رنگ شما:</label>
                         <select id="playerColor" class="form-select">
-                            <option value="white">سفید</option>
-                            <option value="black">سیاه</option>
+                            <option value="white">⚪ سفید (حرکت اول)</option>
+                            <option value="black">⚫ سیاه</option>
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">تم صفحه:</label>
+                        <label class="form-label fw-bold">🎪 تم صفحه:</label>
                         <select id="boardTheme" class="form-select">
-                            <option value="classic">کلاسیک</option>
-                            <option value="dark">تیره</option>
-                            <option value="blue">آبی</option>
-                            <option value="green">سبز</option>
+                            <option value="classic">🏛️ کلاسیک (چوبی)</option>
+                            <option value="dark">🌙 تیره (سبز)</option>
+                            <option value="blue">🌊 آبی (آبی)</option>
+                            <option value="green">🍃 سبز (سبز)</option>
                         </select>
                     </div>
 
-                    <div class="d-grid gap-2">
-                        <button id="newGame" class="btn btn-primary">
-                            <i class="bi bi-plus-circle"></i> بازی جدید
+                    <div class="d-grid gap-2 mb-4">
+                        <button id="newGame" class="btn btn-primary btn-lg">
+                            <i class="bi bi-plus-circle"></i> 🆕 بازی جدید
                         </button>
                         <button id="undoMove" class="btn btn-warning">
-                            <i class="bi bi-arrow-counterclockwise"></i> پس‌گیری حرکت
+                            <i class="bi bi-arrow-counterclockwise"></i> ↩️ پس‌گیری حرکت
                         </button>
                         <button id="hint" class="btn btn-info">
-                            <i class="bi bi-lightbulb"></i> راهنمایی
+                            <i class="bi bi-lightbulb"></i> 💡 راهنمایی حرکت
+                        </button>
+                        <button id="flipBoard" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-repeat"></i> 🔄 چرخش صفحه
                         </button>
                     </div>
-                </div>
 
-                <div class="control-panel">
-                    <h5>وضعیت بازی</h5>
-                    <div id="gameStatus" class="alert alert-info">
-                        نوبت: سفید
-                    </div>
-                    <div id="evaluation" class="text-center">
-                        <small>ارزیابی: برابر</small>
+                    <!-- وضعیت بازی -->
+                    <div class="border-top pt-3">
+                        <h5 class="fw-bold">📊 وضعیت بازی</h5>
+                        <div id="gameStatus" class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> نوبت: سفید
+                        </div>
+                        <div id="evaluation" class="text-center p-2 bg-light rounded">
+                            <small class="text-success">⚖️ ارزیابی: موقعیت برابر</small>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- صفحه شطرنج -->
-            <div class="col-md-4">
+            <!-- صفحه شطرنج وسط -->
+            <div class="col-lg-4 col-md-7">
                 <div class="text-center">
-                    <div id="chessboard" class="chess-board mb-3"></div>
-                    <button id="flipBoard" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-repeat"></i> چرخش صفحه
-                    </button>
+                    <div id="chessboard" class="chess-board mb-4"></div>
+                    <div class="bg-light rounded p-3">
+                        <h6 class="fw-bold">📋 راهنمای بازی</h6>
+                        <small class="text-muted">
+                            • برای حرکت: روی مهره کلیک کرده سپس روی خانه مقصد کلیک کنید<br>
+                            • مربع زرد: مهره انتخاب شده<br>
+                            • نقطه سبز: حرکت مجاز<br>
+                            • حلقه قرمز: گرفتن مهره حریف
+                        </small>
+                    </div>
                 </div>
             </div>
 
-            <!-- تاریخچه حرکات -->
-            <div class="col-md-4">
-                <div class="control-panel">
-                    <h5>تاریخچه حرکات</h5>
+            <!-- تاریخچه حرکات سمت چپ -->
+            <div class="col-lg-4 col-md-12">
+                <div class="control-panel h-100">
+                    <h4 class="border-bottom pb-2 mb-3">📜 تاریخچه حرکات</h4>
                     <div id="moveHistory" class="move-history">
-                        <!-- حرکات اینجا نمایش داده می‌شوند -->
+                        <div class="text-center text-muted p-3">
+                            <i class="bi bi-clock-history"></i><br>
+                            حرکات بازی در اینجا نمایش داده می‌شود
+                        </div>
+                    </div>
+                    
+                    <!-- آمار سریع -->
+                    <div class="border-top pt-3 mt-3">
+                        <h6 class="fw-bold">📈 آمار بازی</h6>
+                        <div class="row text-center small">
+                            <div class="col-6">
+                                <div class="bg-primary text-white rounded p-2 mb-2">
+                                    <div>⚪ سفید</div>
+                                    <strong id="whiteStats">0</strong>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="bg-dark text-white rounded p-2 mb-2">
+                                    <div>⚫ سیاه</div>
+                                    <strong id="blackStats">0</strong>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- کتابخانه‌های ضروری -->
+    <!-- کتابخانه‌ها -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     
-    <!-- فایل‌های پروژه -->
-    <script src="js/chess.js"></script>
-    <script src="js/ai.js"></script>
-    <script src="js/game.js"></script>
-
+    <!-- اسکریپت اصلی -->
     <script>
-        // راه‌اندازی بازی وقتی همه چیز لود شد
+        // تعریف کلاس اصلی بازی
+        class ChessGame {
+            constructor() {
+                this.chess = new Chess();
+                this.boardElement = document.getElementById('chessboard');
+                this.moveHistoryElement = document.getElementById('moveHistory');
+                this.gameStatusElement = document.getElementById('gameStatus');
+                this.evaluationElement = document.getElementById('evaluation');
+                
+                this.isPlayerWhite = true;
+                this.gameActive = true;
+                this.selectedSquare = null;
+                this.possibleMoves = [];
+                this.boardFlipped = false;
+
+                this.init();
+            }
+
+            init() {
+                console.log('🚀 شروع بازی شطرنج...');
+                this.drawBoard();
+                this.setupEventListeners();
+                this.updateGameStatus();
+                console.log('✅ بازی آماده است!');
+            }
+
+            drawBoard() {
+                console.log('🎨 رسم صفحه شطرنج...');
+                this.boardElement.innerHTML = '';
+                
+                const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+                const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+                
+                if (this.boardFlipped) {
+                    files.reverse();
+                    ranks.reverse();
+                }
+
+                for (let rankIndex = 0; rankIndex < 8; rankIndex++) {
+                    const row = document.createElement('div');
+                    row.className = 'board-row';
+                    
+                    for (let fileIndex = 0; fileIndex < 8; fileIndex++) {
+                        const square = document.createElement('div');
+                        const squareColor = (rankIndex + fileIndex) % 2 === 0 ? 'light' : 'dark';
+                        square.className = `square ${squareColor}`;
+                        const squareName = files[fileIndex] + ranks[rankIndex];
+                        square.dataset.square = squareName;
+                        
+                        // اضافه کردن مختصات
+                        if (rankIndex === 7) {
+                            const fileCoord = document.createElement('div');
+                            fileCoord.className = 'coordinates coord-file';
+                            fileCoord.textContent = files[fileIndex];
+                            square.appendChild(fileCoord);
+                        }
+                        
+                        if (fileIndex === 0) {
+                            const rankCoord = document.createElement('div');
+                            rankCoord.className = 'coordinates coord-rank';
+                            rankCoord.textContent = ranks[rankIndex];
+                            square.appendChild(rankCoord);
+                        }
+                        
+                        square.addEventListener('click', () => this.handleSquareClick(squareName));
+                        row.appendChild(square);
+                    }
+                    
+                    this.boardElement.appendChild(row);
+                }
+                
+                this.updatePieces();
+            }
+
+            handleSquareClick(square) {
+                if (!this.gameActive) return;
+                
+                console.log('📍 کلیک روی خانه:', square);
+                const piece = this.chess.get(square);
+                
+                // اگر مربعی انتخاب شده بود و کاربر روی مربع دیگری کلیک کرد
+                if (this.selectedSquare && this.selectedSquare !== square) {
+                    const move = this.tryMove(this.selectedSquare, square);
+                    if (move) {
+                        this.makeMove(move);
+                        return;
+                    }
+                }
+                
+                // اگر کاربر روی مهره خودش کلیک کرد
+                if (piece && this.isPlayerPiece(piece)) {
+                    this.selectedSquare = square;
+                    this.possibleMoves = this.chess.moves({
+                        square: square,
+                        verbose: true
+                    });
+                    
+                    this.clearHighlights();
+                    this.highlightSquare(square, 'selected');
+                    this.highlightPossibleMoves();
+                } else {
+                    this.clearSelection();
+                }
+            }
+
+            tryMove(from, to) {
+                const moves = this.chess.moves({ verbose: true });
+                return moves.find(move => move.from === from && move.to === to);
+            }
+
+            makeMove(move) {
+                try {
+                    const result = this.chess.move(move);
+                    if (result) {
+                        console.log('✅ حرکت انجام شد:', move);
+                        this.selectedSquare = null;
+                        this.possibleMoves = [];
+                        this.clearHighlights();
+                        this.updatePieces();
+                        this.updateMoveHistory();
+                        this.updateGameStatus();
+                        
+                        // اگر بازی ادامه دارد، حرکت AI را انجام بده
+                        if (this.gameActive) {
+                            setTimeout(() => this.makeAIMove(), 500);
+                        }
+                    }
+                    return result;
+                } catch (error) {
+                    console.error('❌ خطا در انجام حرکت:', error);
+                    return null;
+                }
+            }
+
+            makeAIMove() {
+                if (!this.gameActive) return;
+                
+                console.log('🤖 AI در حال فکر کردن...');
+                const moves = this.chess.moves({ verbose: true });
+                
+                if (moves.length === 0) return;
+                
+                // AI ساده: انتخاب تصادفی یک حرکت
+                const randomMove = moves[Math.floor(Math.random() * moves.length)];
+                
+                setTimeout(() => {
+                    const result = this.chess.move(randomMove);
+                    if (result) {
+                        console.log('🤖 AI حرکت کرد:', randomMove.san);
+                        this.updatePieces();
+                        this.updateMoveHistory();
+                        this.updateGameStatus();
+                    }
+                }, 1000);
+            }
+
+            updatePieces() {
+                // پاک کردن مهره‌های قبلی
+                document.querySelectorAll('.piece').forEach(piece => piece.remove());
+                
+                // رسم مهره‌های جدید
+                for (let rank = 0; rank < 8; rank++) {
+                    for (let file = 0; file < 8; file++) {
+                        const square = String.fromCharCode(97 + file) + (8 - rank);
+                        const piece = this.chess.get(square);
+                        
+                        if (piece) {
+                            const squareElement = this.getSquareElement(square);
+                            if (squareElement) {
+                                const pieceElement = document.createElement('div');
+                                pieceElement.className = `piece ${piece.color}`;
+                                pieceElement.textContent = this.getPieceSymbol(piece.type, piece.color);
+                                squareElement.appendChild(pieceElement);
+                            }
+                        }
+                    }
+                }
+                
+                this.highlightPossibleMoves();
+            }
+
+            getPieceSymbol(type, color) {
+                const symbols = {
+                    p: { white: '♙', black: '♟' },
+                    n: { white: '♘', black: '♞' },
+                    b: { white: '♗', black: '♝' },
+                    r: { white: '♖', black: '♜' },
+                    q: { white: '♕', black: '♛' },
+                    k: { white: '♔', black: '♚' }
+                };
+                return symbols[type][color];
+            }
+
+            getSquareElement(square) {
+                return document.querySelector(`[data-square="${square}"]`);
+            }
+
+            highlightSquare(square, className) {
+                const element = this.getSquareElement(square);
+                if (element) element.classList.add(className);
+            }
+
+            highlightPossibleMoves() {
+                this.possibleMoves.forEach(move => {
+                    const className = move.flags.includes('c') || move.flags.includes('e') ? 
+                        'possible-capture' : 'possible-move';
+                    this.highlightSquare(move.to, className);
+                });
+            }
+
+            clearHighlights() {
+                document.querySelectorAll('.square').forEach(square => {
+                    square.classList.remove('selected', 'possible-move', 'possible-capture');
+                });
+            }
+
+            clearSelection() {
+                this.selectedSquare = null;
+                this.possibleMoves = [];
+                this.clearHighlights();
+            }
+
+            isPlayerPiece(piece) {
+                const currentTurn = this.chess.turn();
+                return (piece.color === 'w' && currentTurn === 'w') || 
+                       (piece.color === 'b' && currentTurn === 'b');
+            }
+
+            updateMoveHistory() {
+                this.moveHistoryElement.innerHTML = '';
+                const moves = this.chess.history({ verbose: true });
+                
+                if (moves.length === 0) {
+                    this.moveHistoryElement.innerHTML = `
+                        <div class="text-center text-muted p-3">
+                            <i class="bi bi-chess-board"></i><br>
+                            هنوز حرکتی انجام نشده است
+                        </div>
+                    `;
+                    return;
+                }
+                
+                for (let i = 0; i < moves.length; i += 2) {
+                    const moveRow = document.createElement('div');
+                    moveRow.className = 'move-row';
+                    
+                    const moveNumber = document.createElement('span');
+                    moveNumber.className = 'text-muted me-2';
+                    moveNumber.textContent = `${Math.floor(i/2) + 1}.`;
+                    
+                    const whiteMove = document.createElement('span');
+                    whiteMove.className = 'badge bg-primary me-2';
+                    whiteMove.textContent = moves[i].san;
+                    
+                    const blackMove = document.createElement('span');
+                    if (moves[i + 1]) {
+                        blackMove.className = 'badge bg-dark';
+                        blackMove.textContent = moves[i + 1].san;
+                    }
+                    
+                    moveRow.appendChild(moveNumber);
+                    moveRow.appendChild(whiteMove);
+                    moveRow.appendChild(blackMove);
+                    this.moveHistoryElement.appendChild(moveRow);
+                }
+                
+                this.moveHistoryElement.scrollTop = this.moveHistoryElement.scrollHeight;
+            }
+
+            updateGameStatus() {
+                const statusElement = this.gameStatusElement;
+                
+                if (this.chess.isCheckmate()) {
+                    statusElement.className = 'alert alert-danger';
+                    statusElement.innerHTML = `<i class="bi bi-trophy"></i> <strong>کیش و مات!</strong> ${this.chess.turn() === 'w' ? 'سیاه' : 'سفید'} برنده شد!`;
+                    this.gameActive = false;
+                } else if (this.chess.isDraw()) {
+                    statusElement.className = 'alert alert-warning';
+                    statusElement.innerHTML = `<i class="bi bi-handshake"></i> <strong>بازی مساوی شد!</strong>`;
+                    this.gameActive = false;
+                } else if (this.chess.isCheck()) {
+                    statusElement.className = 'alert alert-warning';
+                    statusElement.innerHTML = `<i class="bi bi-exclamation-triangle"></i> <strong>کیش!</strong> نوبت ${this.chess.turn() === 'w' ? 'سفید' : 'سیاه'}`;
+                } else {
+                    statusElement.className = 'alert alert-info';
+                    statusElement.innerHTML = `<i class="bi bi-arrow-clockwise"></i> نوبت: ${this.chess.turn() === 'w' ? 'سفید' : 'سیاه'}`;
+                    this.gameActive = true;
+                }
+            }
+
+            setupEventListeners() {
+                // دکمه‌های کنترل
+                document.getElementById('newGame').addEventListener('click', () => this.newGame());
+                document.getElementById('undoMove').addEventListener('click', () => this.undoMove());
+                document.getElementById('hint').addEventListener('click', () => this.getHint());
+                document.getElementById('flipBoard').addEventListener('click', () => this.flipBoard());
+                
+                // تنظیمات
+                document.getElementById('playerColor').addEventListener('change', (e) => {
+                    this.isPlayerWhite = e.target.value === 'white';
+                    this.newGame();
+                });
+                
+                document.getElementById('boardTheme').addEventListener('change', (e) => {
+                    document.body.setAttribute('data-theme', e.target.value);
+                });
+            }
+
+            newGame() {
+                this.chess.reset();
+                this.gameActive = true;
+                this.selectedSquare = null;
+                this.possibleMoves = [];
+                this.clearHighlights();
+                this.updatePieces();
+                this.updateMoveHistory();
+                this.updateGameStatus();
+                this.evaluationElement.innerHTML = '<small class="text-success">⚖️ ارزیابی: موقعیت برابر</small>';
+                
+                console.log('🆕 بازی جدید شروع شد');
+            }
+
+            undoMove() {
+                try {
+                    if (this.chess.history().length >= 2) {
+                        this.chess.undo();
+                        this.chess.undo();
+                        this.updatePieces();
+                        this.updateMoveHistory();
+                        this.updateGameStatus();
+                        console.log('↩️ دو حرکت آخر پس گرفته شد');
+                    } else if (this.chess.history().length === 1) {
+                        this.chess.undo();
+                        this.updatePieces();
+                        this.updateMoveHistory();
+                        this.updateGameStatus();
+                        console.log('↩️ یک حرکت پس گرفته شد');
+                    }
+                } catch (error) {
+                    alert('⚠️ امکان پس‌گیری حرکت وجود ندارد');
+                }
+            }
+
+            flipBoard() {
+                this.boardFlipped = !this.boardFlipped;
+                this.drawBoard();
+                console.log('🔄 صفحه چرخانده شد');
+            }
+
+            getHint() {
+                const moves = this.chess.moves({ verbose: true });
+                if (moves.length > 0) {
+                    const randomMove = moves[Math.floor(Math.random() * moves.length)];
+                    alert(`💡 پیشنهاد حرکت: ${randomMove.san} (از ${randomMove.from} به ${randomMove.to})`);
+                } else {
+                    alert('⚠️ هیچ حرکت مجازی وجود ندارد');
+                }
+            }
+        }
+
+        // راه‌اندازی بازی وقتی صفحه کاملاً لود شد
         window.addEventListener('load', function() {
-            console.log('Starting chess game...');
-            window.chessGame = new ChessGame();
+            // اضافه کردن chess.js از CDN
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js';
+            script.onload = function() {
+                console.log('✅ chess.js loaded successfully');
+                window.chessGame = new ChessGame();
+            };
+            script.onerror = function() {
+                console.error('❌ Failed to load chess.js');
+                alert('خطا در لود کتابخانه شطرنج. لطفا صفحه را رفرش کنید.');
+            };
+            document.head.appendChild(script);
         });
     </script>
 </body>
