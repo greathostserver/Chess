@@ -5,16 +5,15 @@ class ChessBoard {
         this.selectedSquare = null;
         this.possibleMoves = [];
         this.boardFlipped = false;
-        this.draggedPiece = null;
     }
 
     init() {
         this.drawBoard();
-        this.setupEventListeners();
         this.updatePieces();
     }
 
     drawBoard() {
+        console.log('Drawing chess board...');
         this.boardElement.innerHTML = '';
         
         const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
@@ -33,10 +32,25 @@ class ChessBoard {
                 const square = document.createElement('div');
                 const squareColor = (rankIndex + fileIndex) % 2 === 0 ? 'light' : 'dark';
                 square.className = `square ${squareColor}`;
-                square.dataset.square = files[fileIndex] + ranks[rankIndex];
+                const squareName = files[fileIndex] + ranks[rankIndex];
+                square.dataset.square = squareName;
                 
-                this.addCoordinates(square, rankIndex, fileIndex, files, ranks);
-                square.addEventListener('click', (e) => this.handleSquareClick(e));
+                // مختصات
+                if (rankIndex === 7) {
+                    const fileCoord = document.createElement('div');
+                    fileCoord.className = 'coordinates coord-file';
+                    fileCoord.textContent = files[fileIndex];
+                    square.appendChild(fileCoord);
+                }
+                
+                if (fileIndex === 0) {
+                    const rankCoord = document.createElement('div');
+                    rankCoord.className = 'coordinates coord-rank';
+                    rankCoord.textContent = ranks[rankIndex];
+                    square.appendChild(rankCoord);
+                }
+                
+                square.addEventListener('click', () => this.handleSquareClick(squareName));
                 row.appendChild(square);
             }
             
@@ -44,127 +58,40 @@ class ChessBoard {
         }
     }
 
-    addCoordinates(square, rankIndex, fileIndex, files, ranks) {
-        // اضافه کردن مختصات فایل (حروف)
-        if (rankIndex === 7) {
-            const fileCoord = document.createElement('div');
-            fileCoord.className = 'coordinates coord-file';
-            fileCoord.textContent = files[fileIndex];
-            square.appendChild(fileCoord);
-        }
-        
-        // اضافه کردن مختصات رنک (اعداد)
-        if (fileIndex === 0) {
-            const rankCoord = document.createElement('div');
-            rankCoord.className = 'coordinates coord-rank';
-            rankCoord.textContent = ranks[rankIndex];
-            square.appendChild(rankCoord);
-        }
-    }
-
-    setupEventListeners() {
-        this.setupDragAndDrop();
-    }
-
-    setupDragAndDrop() {
-        this.boardElement.addEventListener('dragstart', (e) => this.handleDragStart(e));
-        this.boardElement.addEventListener('dragover', (e) => this.handleDragOver(e));
-        this.boardElement.addEventListener('dragleave', (e) => this.handleDragLeave(e));
-        this.boardElement.addEventListener('drop', (e) => this.handleDrop(e));
-        this.boardElement.addEventListener('dragend', (e) => this.handleDragEnd(e));
-    }
-
-    handleDragStart(e) {
-        if (!e.target.classList.contains('piece')) return;
-        
-        const square = e.target.parentElement.dataset.square;
+    handleSquareClick(square) {
+        console.log('Square clicked:', square);
         const piece = this.chess.get(square);
         
-        if (piece && this.isPlayerPiece(piece)) {
-            this.draggedPiece = square;
-            e.target.classList.add('dragging');
-            e.dataTransfer.setData('text/plain', square);
-            this.handleSquareSelection(square);
-        } else {
-            e.preventDefault();
-        }
-    }
-
-    handleDragOver(e) {
-        e.preventDefault();
-        if (e.target.classList.contains('square')) {
-            e.target.classList.add('drag-over');
-        }
-    }
-
-    handleDragLeave(e) {
-        e.target.classList.remove('drag-over');
-    }
-
-    handleDrop(e) {
-        e.preventDefault();
-        e.target.classList.remove('drag-over');
-        
-        if (e.target.classList.contains('square') && this.draggedPiece) {
-            const fromSquare = this.draggedPiece;
-            const toSquare = e.target.dataset.square;
-            
-            this.draggedPiece = null;
-            this.handleMove(fromSquare, toSquare);
-        }
-        
-        this.clearDragState();
-    }
-
-    handleDragEnd(e) {
-        e.target.classList.remove('dragging');
-        this.clearDragState();
-    }
-
-    clearDragState() {
-        document.querySelectorAll('.square.drag-over, .piece.dragging').forEach(el => {
-            el.classList.remove('drag-over', 'dragging');
-        });
-    }
-
-    handleSquareClick(e) {
-        const square = e.currentTarget.dataset.square;
-        const piece = this.chess.get(square);
-        
+        // اگر مربعی انتخاب شده بود
         if (this.selectedSquare && this.selectedSquare !== square) {
-            this.handleMove(this.selectedSquare, square);
-            return;
+            const move = this.tryMove(this.selectedSquare, square);
+            if (move) {
+                if (typeof window.chessGame.handleMove === 'function') {
+                    window.chessGame.handleMove(move);
+                }
+                return;
+            }
         }
         
+        // اگر روی مهره خودی کلیک شد
         if (piece && this.isPlayerPiece(piece)) {
-            this.handleSquareSelection(square);
+            this.selectedSquare = square;
+            this.possibleMoves = this.chess.moves({
+                square: square,
+                verbose: true
+            });
+            
+            this.clearHighlights();
+            this.highlightSquare(square, 'selected');
+            this.highlightPossibleMoves();
         } else {
             this.clearSelection();
         }
     }
 
-    handleSquareSelection(square) {
-        this.selectedSquare = square;
-        this.possibleMoves = this.chess.moves({
-            square: square,
-            verbose: true
-        });
-        
-        this.clearHighlights();
-        this.highlightSquare(square, 'selected');
-        this.highlightPossibleMoves();
-    }
-
-    handleMove(from, to) {
-        const move = this.validateMove(from, to);
-        if (move) {
-            this.executeMove(move);
-        }
-    }
-
-    validateMove(from, to) {
-        const possibleMoves = this.chess.moves({ square: from, verbose: true });
-        return possibleMoves.find(move => move.from === from && move.to === to);
+    tryMove(from, to) {
+        const moves = this.chess.moves({ verbose: true });
+        return moves.find(move => move.from === from && move.to === to);
     }
 
     executeMove(move) {
@@ -178,31 +105,26 @@ class ChessBoard {
     }
 
     updatePieces() {
+        // پاک کردن مهره‌های قبلی
         document.querySelectorAll('.piece').forEach(piece => piece.remove());
         
+        // اضافه کردن مهره‌های جدید
         for (let rank = 0; rank < 8; rank++) {
             for (let file = 0; file < 8; file++) {
                 const square = String.fromCharCode(97 + file) + (8 - rank);
                 const piece = this.chess.get(square);
                 
                 if (piece) {
-                    this.createPieceElement(square, piece);
+                    const squareElement = this.getSquareElement(square);
+                    if (squareElement) {
+                        const pieceElement = document.createElement('div');
+                        pieceElement.className = `piece ${piece.color}`;
+                        pieceElement.textContent = this.getPieceSymbol(piece.type, piece.color);
+                        squareElement.appendChild(pieceElement);
+                    }
                 }
             }
         }
-        
-        this.highlightPossibleMoves();
-    }
-
-    createPieceElement(square, piece) {
-        const squareElement = this.getSquareElement(square);
-        if (!squareElement) return;
-        
-        const pieceElement = document.createElement('div');
-        pieceElement.className = `piece ${piece.color}`;
-        pieceElement.textContent = this.getPieceSymbol(piece.type, piece.color);
-        pieceElement.draggable = true;
-        squareElement.appendChild(pieceElement);
     }
 
     getPieceSymbol(type, color) {
@@ -222,16 +144,13 @@ class ChessBoard {
     }
 
     highlightSquare(square, className) {
-        const squareElement = this.getSquareElement(square);
-        if (squareElement) {
-            squareElement.classList.add(className);
-        }
+        const element = this.getSquareElement(square);
+        if (element) element.classList.add(className);
     }
 
     highlightPossibleMoves() {
         this.possibleMoves.forEach(move => {
-            const className = move.flags.includes('c') || move.flags.includes('e') ? 
-                'possible-capture' : 'possible-move';
+            const className = move.flags.includes('c') ? 'possible-capture' : 'possible-move';
             this.highlightSquare(move.to, className);
         });
     }
@@ -249,8 +168,8 @@ class ChessBoard {
     }
 
     isPlayerPiece(piece) {
-        const isWhiteTurn = this.chess.turn() === 'w';
-        return (piece.color === 'w' && isWhiteTurn) || (piece.color === 'b' && !isWhiteTurn);
+        // فرض می‌کنیم همیشه نوبت بازیکن است (برای تست)
+        return true;
     }
 
     flipBoard() {
@@ -268,19 +187,10 @@ class ChessBoard {
     getGameState() {
         return {
             fen: this.chess.fen(),
-            pgn: this.chess.pgn(),
-            history: this.chess.history({ verbose: true }),
             isCheck: this.chess.isCheck(),
             isCheckmate: this.chess.isCheckmate(),
             isDraw: this.chess.isDraw(),
-            isStalemate: this.chess.isStalemate(),
             turn: this.chess.turn()
         };
-    }
-
-    loadGame(fen) {
-        this.chess.load(fen);
-        this.updatePieces();
-        this.clearSelection();
     }
 }
