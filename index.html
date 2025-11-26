@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شطرنج پیشرفته - Chess Master</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body>
+    <div class="container-fluid">
+        <header class="text-center py-4 bg-dark text-white">
+            <h1><i class="bi bi-chess-knight"></i> شطرنج حرفه‌ای</h1>
+            <p class="lead">با هوش مصنوعی چندسطحی</p>
+        </header>
+
+        <div class="row mt-4">
+            <!-- بخش کنترل بازی -->
+            <div class="col-md-3">
+                <div class="control-panel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>تنظیمات بازی</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">سطح هوش مصنوعی:</label>
+                                <select id="aiLevel" class="form-select">
+                                    <option value="1">مبتدی (عمق 2)</option>
+                                    <option value="2" selected>متوسط (عمق 4)</option>
+                                    <option value="3">حرفه‌ای (عمق 6)</option>
+                                    <option value="4">استاد (عمق 8)</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">رنگ مهره‌ها:</label>
+                                <select id="playerColor" class="form-select">
+                                    <option value="white">سفید</option>
+                                    <option value="black">سیاه</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">تم صفحه:</label>
+                                <select id="boardTheme" class="form-select">
+                                    <option value="classic">کلاسیک</option>
+                                    <option value="dark">تیره</option>
+                                    <option value="blue">آبی</option>
+                                    <option value="green">سبز</option>
+                                </select>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button id="newGame" class="btn btn-primary">
+                                    <i class="bi bi-plus-circle"></i> بازی جدید
+                                </button>
+                                <button id="undoMove" class="btn btn-warning">
+                                    <i class="bi bi-arrow-counterclockwise"></i> پس‌گیری حرکت
+                                </button>
+                                <button id="saveGame" class="btn btn-success">
+                                    <i class="bi bi-download"></i> ذخیره بازی
+                                </button>
+                                <button id="loadGame" class="btn btn-info">
+                                    <i class="bi bi-upload"></i> بارگذاری بازی
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- وضعیت بازی -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5>وضعیت بازی</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="gameStatus" class="alert alert-info">
+                                نوبت: سفید
+                            </div>
+                            <div id="evaluation" class="text-center">
+                                <small>ارزیابی: برابر</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- تایمر -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5>تایمر</h5>
+                        </div>
+                        <div class="card-body text-center">
+                            <div class="timer">
+                                <div>سفید: <span id="whiteTime">10:00</span></div>
+                                <div>سیاه: <span id="blackTime">10:00</span></div>
+                            </div>
+                            <button id="startTimer" class="btn btn-sm btn-outline-primary mt-2">
+                                شروع تایمر
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- صفحه شطرنج -->
+            <div class="col-md-6">
+                <div class="chess-board-container">
+                    <div id="chessboard" class="chess-board"></div>
+                    <div class="game-controls mt-3 text-center">
+                        <button id="flipBoard" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-repeat"></i> چرخش صفحه
+                        </button>
+                        <button id="hint" class="btn btn-outline-info">
+                            <i class="bi bi-lightbulb"></i> راهنمایی
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- تاریخچه حرکات -->
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>تاریخچه حرکات</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="moveHistory" class="move-history">
+                            <!-- حرکات اینجا نمایش داده می‌شوند -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal برای راهنمایی -->
+    <div class="modal fade" id="hintModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">راهنمایی حرکت</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="hintText">پیشنهاد حرکت: ...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
+    <script src="js/stockfish.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html>
